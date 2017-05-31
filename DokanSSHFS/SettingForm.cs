@@ -1,9 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Text;
 using System.Windows.Forms;
 using System.Diagnostics;
 using System.Threading;
@@ -13,7 +8,7 @@ namespace DokanSSHFS
 {
     public partial class SettingForm : Form
     {
-        private SSHFS sshfs;
+        private SshFS sshfs;
         private DokanOptions opt;
         private string mountPoint;
         private int threadCount;
@@ -30,12 +25,11 @@ namespace DokanSSHFS
         private void SettingForm_Load(object sender, EventArgs e)
         {
             FormBorderStyle = FormBorderStyle.FixedSingle;
-            //notifyIcon1.Icon = SystemIcons.Application;
             notifyIcon1.Visible = true;
             SettingLoad();
         }
 
-        private void open_Click(object sender, EventArgs e)
+        private void Open_Click(object sender, EventArgs e)
         {
             if (openFileDialog1.ShowDialog() == DialogResult.OK)
             {
@@ -44,7 +38,7 @@ namespace DokanSSHFS
             
         }
 
-        private void usePassword_CheckedChanged(object sender, EventArgs e)
+        private void UsePassword_CheckedChanged(object sender, EventArgs e)
         {
             if (usePassword.Checked)
             {
@@ -56,7 +50,7 @@ namespace DokanSSHFS
             }
         }
 
-        private void usePrivateKey_CheckedChanged(object sender, EventArgs e)
+        private void UsePrivateKey_CheckedChanged(object sender, EventArgs e)
         {
             if (usePrivateKey.Checked)
             {
@@ -68,24 +62,26 @@ namespace DokanSSHFS
             }
         }
 
-        private void cancel_Click(object sender, EventArgs e)
+        private void Cancel_Click(object sender, EventArgs e)
         {
             notifyIcon1.Visible = false;
             Application.Exit();
         }
 
-        private void connect_Click(object sender, EventArgs e)
+        private void Connect_Click(object sender, EventArgs e)
         {
-            this.Hide();
+            Hide();
 
             int p = 22;
             
-            sshfs = new SSHFS();
+            sshfs = new SshFS();
             opt = new DokanOptions();
 
             if (DokanSSHFS.DokanDebug)
                 opt |= DokanOptions.DebugMode;
+
             opt |= DokanOptions.AltStream; // DokanOptions.KeepAlive always enabled.
+
             mountPoint = "n:\\";
             threadCount = 0;
 
@@ -132,7 +128,7 @@ namespace DokanSSHFS
 
             if (message.Length != 0)
             {
-                this.Show();
+                Show();
                 MessageBox.Show(message, "Error");
                 return;
             }
@@ -170,7 +166,7 @@ namespace DokanSSHFS
             }
             else
             {
-                this.Show();
+                Show();
                 MessageBox.Show("failed to connect", "Error");
                 return;
             }
@@ -206,17 +202,17 @@ namespace DokanSSHFS
 
         class MountWorker
         {
-            private IDokanOperations sshfs_;
-            private DokanOptions opt_;
-            private string mountPoint_;
-            private int threadCount_;
+            private IDokanOperations _sshfs;
+            private DokanOptions _opt;
+            private string _mountPoint;
+            private int _threadCount;
 
             public MountWorker(IDokanOperations sshfs, DokanOptions opt, string mountPoint, int threadCount)
             {
-                sshfs_ = sshfs;
-                opt_ = opt;
-                mountPoint_ = mountPoint;
-                threadCount_ = threadCount;
+                _sshfs = sshfs;
+                _opt = opt;
+                _mountPoint = mountPoint;
+                _threadCount = threadCount;
             }
 
             public void Start()
@@ -224,7 +220,7 @@ namespace DokanSSHFS
                 System.IO.Directory.SetCurrentDirectory(Application.StartupPath);
                 try
                 {
-                    sshfs_.Mount(mountPoint_, opt_, threadCount_);
+                    _sshfs.Mount(_mountPoint, _opt, _threadCount);
                 }
                 catch (DokanException ex)
                 {
@@ -262,14 +258,14 @@ namespace DokanSSHFS
         }
 
         
-        private void unmount_Click(object sender, EventArgs e)
+        private void Unmount_Click(object sender, EventArgs e)
         {
-            Debug.WriteLine("unmount_Click");          
-            this.Unmount();
+            Debug.WriteLine("unmount_Click");
+            Unmount();
             isUnmounted_ = true;
         }
 
-        private void save_Click(object sender, EventArgs e)
+        private void Save_Click(object sender, EventArgs e)
         {
             Setting s = settings[selectedIndex];
 
@@ -301,9 +297,7 @@ namespace DokanSSHFS
             SettingLoad(selectedIndex);
         }
 
-
-
-        private void settingNames_SelectedIndexChanged(object sender, EventArgs e)
+        private void SettingNames_SelectedIndexChanged(object sender, EventArgs e)
         {
             selectedIndex = settingNames.SelectedIndex;
             SettingLoad(settingNames.SelectedIndex);
@@ -320,8 +314,8 @@ namespace DokanSSHFS
             password.Text = "";
             usePassword.Checked = s.UsePassword;
             usePrivateKey.Checked = !s.UsePassword;
-            usePassword_CheckedChanged(null, null);
-            usePrivateKey_CheckedChanged(null, null);
+            UsePassword_CheckedChanged(null, null);
+            UsePrivateKey_CheckedChanged(null, null);
 
             disableCache.Checked = s.DisableCache;
             withoutOfflineAttribute.Checked = s.WithoutOfflineAttribute;
@@ -354,7 +348,7 @@ namespace DokanSSHFS
         private void mount_Click(object sender, EventArgs e)
         {
             unmount.Visible = false;
-            this.Show();
+            Show();
         }
     }
 }

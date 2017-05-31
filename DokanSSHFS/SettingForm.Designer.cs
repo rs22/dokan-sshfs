@@ -148,7 +148,7 @@
             this.connect.TabIndex = 15;
             this.connect.Text = "Connect";
             this.connect.UseVisualStyleBackColor = true;
-            this.connect.Click += new System.EventHandler(this.connect_Click);
+            this.connect.Click += new System.EventHandler(this.Connect_Click);
             // 
             // cancel
             // 
@@ -158,7 +158,7 @@
             this.cancel.TabIndex = 16;
             this.cancel.Text = "Cancel";
             this.cancel.UseVisualStyleBackColor = true;
-            this.cancel.Click += new System.EventHandler(this.cancel_Click);
+            this.cancel.Click += new System.EventHandler(this.Cancel_Click);
             // 
             // usePassword
             // 
@@ -171,7 +171,7 @@
             this.usePassword.TabStop = true;
             this.usePassword.Text = "Password";
             this.usePassword.UseVisualStyleBackColor = true;
-            this.usePassword.CheckedChanged += new System.EventHandler(this.usePassword_CheckedChanged);
+            this.usePassword.CheckedChanged += new System.EventHandler(this.UsePassword_CheckedChanged);
             // 
             // password
             // 
@@ -190,7 +190,7 @@
             this.usePrivateKey.TabIndex = 9;
             this.usePrivateKey.Text = "Identity";
             this.usePrivateKey.UseVisualStyleBackColor = true;
-            this.usePrivateKey.CheckedChanged += new System.EventHandler(this.usePrivateKey_CheckedChanged);
+            this.usePrivateKey.CheckedChanged += new System.EventHandler(this.UsePrivateKey_CheckedChanged);
             // 
             // privatekey
             // 
@@ -209,7 +209,7 @@
             this.open.TabIndex = 11;
             this.open.Text = "Open";
             this.open.UseVisualStyleBackColor = true;
-            this.open.Click += new System.EventHandler(this.open_Click);
+            this.open.Click += new System.EventHandler(this.Open_Click);
             // 
             // notifyIcon1
             // 
@@ -241,7 +241,7 @@
             this.unmount.Size = new System.Drawing.Size(90, 22);
             this.unmount.Text = "Unmount";
             this.unmount.Visible = false;
-            this.unmount.Click += new System.EventHandler(this.unmount_Click);
+            this.unmount.Click += new System.EventHandler(this.Unmount_Click);
             // 
             // mount
             // 
@@ -267,7 +267,7 @@
             this.save.TabIndex = 2;
             this.save.Text = "Save";
             this.save.UseVisualStyleBackColor = true;
-            this.save.Click += new System.EventHandler(this.save_Click);
+            this.save.Click += new System.EventHandler(this.Save_Click);
             // 
             // delete
             // 
@@ -288,7 +288,7 @@
             this.settingNames.Name = "settingNames";
             this.settingNames.Size = new System.Drawing.Size(175, 20);
             this.settingNames.TabIndex = 1;
-            this.settingNames.SelectedIndexChanged += new System.EventHandler(this.settingNames_SelectedIndexChanged);
+            this.settingNames.SelectedIndexChanged += new System.EventHandler(this.SettingNames_SelectedIndexChanged);
             // 
             // passphrase
             // 

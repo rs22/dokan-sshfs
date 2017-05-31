@@ -92,7 +92,7 @@
   <ItemGroup>
     <Compile Include="Cache.cs" />
     <Compile Include="Console.cs" />
-    <Compile Include="DokanOperations.cs" />
+    <Compile Include="SshFS.cs" />
     <Compile Include="ParseArgs.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -103,7 +103,6 @@
     <Compile Include="SettingForm.Designer.cs">
       <DependentUpon>SettingForm.cs</DependentUpon>
     </Compile>
-    <Compile Include="UserInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="SettingForm.resx">

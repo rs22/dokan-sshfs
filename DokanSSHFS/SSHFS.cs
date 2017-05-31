@@ -1,137 +1,64 @@
 using System;
 using System.Collections.Generic;
-using System.Collections;
 using System.IO;
 using System.Threading;
 using System.Windows.Forms;
-using System.Text;
 
 using DokanNet;
-using Tamir.SharpSsh.jsch;
 using System.Security.AccessControl;
+using Renci.SshNet;
+using Renci.SshNet.Common;
 
 namespace DokanSSHFS
 {
-    class GetMonitor : SftpProgressMonitor
+    public class SshFS : IDokanOperations
     {
-        private long offset_;
-        private long maxOffset_;
+        private object _sessionLock = new Object();
+        private SftpClient _client;
 
-        public GetMonitor(long max)
-        {
-            maxOffset_ = max;
-        }
+        private string _user;
+        private string _host;
+        private int _port;
+        private string _identity;
+        private bool _debug;
+        private string _root;
+        private string _passphrase;
+        private string _password;
 
-        public override bool count(long count)
-        {
-            offset_ += count;
-            Console.Error.WriteLine("count = {0}, offset = {1}", count, offset_);
+        private TextWriter _tw;
 
-            return offset_ < maxOffset_;
-        }
-
-        public override void end()
-        {
-            Console.Error.WriteLine("end");
-        }
-
-        public override void init(int op, string src, string dest, long max)
-        {
-            Console.Error.WriteLine("init file: {0} size: {1}", src, max);
-        }
-    }
-
-    class GetStream : Tamir.SharpSsh.java.io.OutputStream
-    {
-        private byte[] buffer_;
-        private int index_;
-
-        public int RecievedBytes
-        {
-            get
-            {
-                return index_;
-            }
-        }
-
-        public GetStream(byte[] buffer)
-        {
-            buffer_ = buffer;
-            index_ = 0;
-        }
-
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            //Console.Error.WriteLine("Write index: {0} count {1}", index_, count);
-            // full of buffer
-            if (isFull())
-                return;
-
-            int rest = buffer_.Length - index_;
-            count = rest < count ? rest : count;
-            Array.Copy(buffer, offset, buffer_, index_, count);
-            index_ += count;
-        }
-
-        public bool isFull()
-        {
-            return buffer_.Length <= index_;
-        }
-    }
-
-    class SSHFS : IDokanOperations
-    {
-        private JSch jsch_;
-        private Session session_;
-
-        private object sessionLock_ = new Object();
-        private Dictionary<int, ChannelSftp> channels_;
-
-        private string user_;
-        private string host_;
-        private int port_;
-        private string identity_;
-        private bool debug_;
-        private string root_;
-        private string passphrase_;
-        private string password_;
-
-        private System.IO.TextWriter tw_;
-
-        private int trycount_ = 0;
-        private bool connectionError_ = false;
-        private object reconnectLock_ = new object();
-
-        public SSHFS()
-        {
-        }
+        private int _trycount = 0;
+        private bool _connectionError = false;
+        private object _reconnectLock = new object();
 
         public void Initialize(string user, string host, int port, string password, string identity, string passphrase, string root, bool debug)
         {
-            user_ = user;
-            host_ = host;
-            port_ = port;
-            identity_ = identity;
-            password_ = password;
-            passphrase_ = passphrase;
+            _user = user;
+            _host = host;
+            _port = port;
+            _identity = identity;
+            _password = password;
+            _passphrase = passphrase;
 
-            root_ = root;
+            _root = root;
 
-            debug_ = debug;
+            _debug = debug;
 
-            if (debug_ && tw_ != null)
+            if (_debug && _tw != null)
             {
-                System.IO.StreamWriter sw = new System.IO.StreamWriter(Application.UserAppDataPath + "\\error.txt");
-                sw.AutoFlush = true;
-                tw_ = System.IO.TextWriter.Synchronized(sw);
-                Console.SetError(tw_);
+                StreamWriter sw = new StreamWriter(Application.UserAppDataPath + "\\error.txt")
+                {
+                    AutoFlush = true
+                };
+                _tw = TextWriter.Synchronized(sw);
+                Console.SetError(_tw);
             }
 
         }
 
         private void Debug(string format, params object[] args)
         {
-            if (debug_)
+            if (_debug)
             {
                 Console.Error.WriteLine("SSHFS: " + format, args);
                 System.Diagnostics.Debug.WriteLine(string.Format("SSHFS: " + format, args));
@@ -142,21 +69,28 @@ namespace DokanSSHFS
         {
             try
             {
-                channels_ = new Dictionary<int, ChannelSftp>();
+                var credentials = new PasswordAuthenticationMethod(_user, _password);
+                var connectionInfo = new ConnectionInfo(_host, _port, _user, credentials);
+                
+                _client = new SftpClient(connectionInfo);
 
-                jsch_ = new JSch();
-                Hashtable config = new Hashtable();
-                config["StrictHostKeyChecking"] = "no";
+                _client.Connect();
 
-                if (identity_ != null)
-                    jsch_.addIdentity(identity_, passphrase_);
+                //_channels = new Dictionary<int, ChannelSftp>();
 
-                session_ = jsch_.getSession(user_, host_, port_);
-                session_.setConfig(config);
-                session_.setUserInfo(new DokanUserInfo(password_, passphrase_));
-                session_.setPassword(password_);
+                //jsch_ = new JSch();
+                //Hashtable config = new Hashtable();
+                //config["StrictHostKeyChecking"] = "no";
 
-                session_.connect();
+                //if (_identity != null)
+                //    jsch_.addIdentity(_identity, _passphrase);
+
+                //session_ = jsch_.getSession(_user, _host, _port);
+                //session_.setConfig(config);
+                //session_.setUserInfo(new DokanUserInfo(_password, _passphrase));
+                //session_.setPassword(_password);
+
+                //session_.connect();
 
                 return true;
             }
@@ -169,34 +103,31 @@ namespace DokanSSHFS
 
         private bool Reconnect()
         {
-            lock (reconnectLock_)
+            lock (_reconnectLock)
             {
-                if (!connectionError_)
+                if (!_connectionError)
                     return true;
 
                 Debug("Disconnect current sessions\n");
                 try
                 {
-                    foreach (KeyValuePair<int, ChannelSftp> kv in channels_)
-                    {
-                        kv.Value.disconnect();
-                    }
+                    GetClient().Disconnect();
 
-                    session_.disconnect();
+                    //session_.disconnect();
                 }
                 catch (Exception e)
                 {
                     Debug(e.ToString());
                 }
 
-                Debug("Reconnect {0}\n", trycount_);
+                Debug("Reconnect {0}\n", _trycount);
 
-                trycount_++;
+                _trycount++;
 
                 if (SSHConnect())
                 {
                     Debug("Reconnect success\n");
-                    connectionError_ = false;
+                    _connectionError = false;
                     return true;
                 }
                 else
@@ -209,70 +140,69 @@ namespace DokanSSHFS
 
         private string GetPath(string filename)
         {
-            string path = root_ + filename.Replace('\\', '/');
-            Debug("GetPath : {0} thread {1}", path, System.Threading.Thread.CurrentThread.ManagedThreadId);
+            string path = _root + filename.Replace('\\', '/');
+            Debug("GetPath : {0} thread {1}", path, Thread.CurrentThread.ManagedThreadId);
             //Debug("  Stack {0}", new System.Diagnostics.StackTrace().ToString());
             return path;
         }
 
-
-        private ChannelSftp GetChannel()
+        private SftpClient GetClient()
         {
             int threadId = Thread.CurrentThread.ManagedThreadId;
-            ChannelSftp channel;
-            try
-            {
-                channel = channels_[threadId];
-            }
-            catch(KeyNotFoundException)
-            {
+            return _client;
 
-                lock (sessionLock_)
-                {
-                    channel = (ChannelSftp)session_.openChannel("sftp");
-                    channel.connect();
-                    channels_[threadId] = channel;
-                }
-            }
-            return channel;
+            //ChannelSftp channel;
+            //try
+            //{
+            //    channel = channels_[threadId];
+            //}
+            //catch(KeyNotFoundException)
+            //{
+
+            //    lock (sessionLock_)
+            //    {
+            //        channel = (ChannelSftp)session_.openChannel("sftp");
+            //        channel.connect();
+            //        channels_[threadId] = channel;
+            //    }
+            //}
+            //return channel;
         }
 
-        private bool isExist(string path, DokanFileInfo info)
+        private bool PathExists(string path, DokanFileInfo info)
         {
             try
             {
-                ChannelSftp channel = GetChannel();
-                SftpATTRS attr = channel.stat(path);
-                if (attr.isDir())
+                var channel = GetClient();
+                var attr = channel.GetAttributes(path);
+                if (attr.IsDirectory)
                     info.IsDirectory = true;
                 return true;
             }
-            catch (SftpException)
+            catch (SftpPathNotFoundException)
             {
                 return false;
             }
         }
 
-
-        private string ReadPermission(string path)
-        {
-            try
-            {
-                SftpATTRS attr = GetChannel().stat(path);
-                return Convert.ToString(attr.getPermissions() & 0xFFF, 8) + "\n";
-            }
-            catch (SftpException)
-            {
-                return "";
-            }
-            catch (Exception)
-            {
-                connectionError_ = true;
-                Reconnect();
-                return "";
-            }
-        }
-
+        //private string ReadPermission(string path)
+        //{
+        //    try
+        //    {
+        //        var attr = GetClient().GetAttributes(path);
+        //        return Convert.ToString(attr.own() & 0xFFF, 8) + "\n";
+        //    }
+        //    catch (SftpException)
+        //    {
+        //        return "";
+        //    }
+        //    catch (Exception)
+        //    {
+        //        _connectionError = true;
+        //        Reconnect();
+        //        return "";
+        //    }
+        //}
 
         private bool CheckAltStream(string filename)
         {
@@ -305,18 +235,18 @@ namespace DokanSSHFS
             DokanFileInfo info)
         {
 
+            var path = GetPath(filename);
+
             if (info.IsDirectory)
             {
-
                 switch (mode)
                 {
                     case FileMode.Open:
                         Debug("OpenDirectory {0}", filename);
                         try
                         {
-                            string path = GetPath(filename);
-                            SftpATTRS attr = GetChannel().stat(path);
-                            if (attr.isDir())
+                            var attr = GetClient().GetAttributes(path);
+                            if (attr.IsDirectory)
                             {
                                 return NtStatus.Success;
                             }
@@ -325,38 +255,37 @@ namespace DokanSSHFS
                                 return NtStatus.ObjectPathNotFound; // TODO: return not directory?
                             }
                         }
-                        catch (SftpException e)
+                        catch (SftpPathNotFoundException e)
                         {
                             Debug(e.ToString());
                             return NtStatus.ObjectPathNotFound;
                         }
-                        catch (Exception e)
+                        catch (SshConnectionException e)
                         {
-                            connectionError_ = true;
+                            _connectionError = true;
                             Debug(e.ToString());
                             Reconnect();
                             return NtStatus.ObjectPathNotFound;
                         }
 
-                        
+
                     case FileMode.CreateNew:
                         Debug("CreateDirectory {0}", filename);
                         try
                         {
-                            string path = GetPath(filename);
-                            ChannelSftp channel = GetChannel();
+                            var client = GetClient();
 
-                            channel.mkdir(path);
+                            client.CreateDirectory(path);
                             return NtStatus.Success;
                         }
-                        catch (SftpException e)
+                        catch (SftpPermissionDeniedException e)
                         {
                             Debug(e.ToString());
                             return NtStatus.Error;
                         }
-                        catch (Exception e)
+                        catch (SshConnectionException e)
                         {
-                            connectionError_ = true;
+                            _connectionError = true;
                             Debug(e.ToString());
                             Reconnect();
                             return NtStatus.Error; // TODO: more appropriate error code
@@ -372,8 +301,7 @@ namespace DokanSSHFS
                 Debug("CreateFile {0}", filename);
                 try
                 {
-                    string path = GetPath(filename);
-                    ChannelSftp channel = GetChannel();
+                    var client = GetClient();
 
                     if (CheckAltStream(path))
                         return NtStatus.Success;
@@ -383,7 +311,7 @@ namespace DokanSSHFS
                         case FileMode.Open:
                             {
                                 Debug("Open");
-                                if (isExist(path, info))
+                                if (PathExists(path, info))
                                     return NtStatus.Success;
                                 else
                                     return NtStatus.ObjectNameNotFound;
@@ -391,30 +319,27 @@ namespace DokanSSHFS
                         case FileMode.CreateNew:
                             {
                                 Debug("CreateNew");
-                                if (isExist(path, info))
+                                if (PathExists(path, info))
                                     return NtStatus.ObjectNameCollision;
 
                                 Debug("CreateNew put 0 byte");
-                                Tamir.SharpSsh.java.io.OutputStream stream = channel.put(path);
-                                stream.Close();
+                                client.Create(path).Close();
                                 return NtStatus.Success;
                             }
                         case FileMode.Create:
                             {
                                 Debug("Create put 0 byte");
-                                Tamir.SharpSsh.java.io.OutputStream stream = channel.put(path);
-                                stream.Close();
+                                client.Create(path).Close();
                                 return NtStatus.Success;
                             }
                         case FileMode.OpenOrCreate:
                             {
                                 Debug("OpenOrCreate");
 
-                                if (!isExist(path, info))
+                                if (!PathExists(path, info))
                                 {
                                     Debug("OpenOrCreate put 0 byte");
-                                    Tamir.SharpSsh.java.io.OutputStream stream = channel.put(path);
-                                    stream.Close();
+                                    client.Create(path).Close();
                                 }
                                 return NtStatus.Success;
                             }
@@ -422,24 +347,22 @@ namespace DokanSSHFS
                             {
                                 Debug("Truncate");
 
-                                if (!isExist(path, info))
+                                if (!PathExists(path, info))
                                     return NtStatus.ObjectNameNotFound;
 
                                 Debug("Truncate put 0 byte");
-                                Tamir.SharpSsh.java.io.OutputStream stream = channel.put(path);
-                                stream.Close();
+                                client.Create(path).Close();
                                 return NtStatus.Success;
                             }
                         case FileMode.Append:
                             {
                                 Debug("Append");
 
-                                if (isExist(path, info))
+                                if (PathExists(path, info))
                                     return NtStatus.Success;
 
                                 Debug("Append put 0 byte");
-                                Tamir.SharpSsh.java.io.OutputStream stream = channel.put(path);
-                                stream.Close();
+                                client.Create(path).Close();
                                 return NtStatus.Success;
                             }
                         default:
@@ -448,14 +371,15 @@ namespace DokanSSHFS
                     }
 
                 }
-                catch (SftpException e)
-                {
-                    Debug(e.ToString());
-                    return NtStatus.ObjectNameNotFound;
-                }
+                // Don't know what this is for
+                //catch (SftpException e)
+                //{
+                //    Debug(e.ToString());
+                //    return NtStatus.ObjectNameNotFound;
+                //}
                 catch (Exception e)
                 {
-                    connectionError_ = true;
+                    _connectionError = true;
                     Debug(e.ToString());
                     Reconnect();
                     return NtStatus.ObjectNameNotFound;
@@ -485,104 +409,80 @@ namespace DokanSSHFS
             string path = GetPath(filename);
 
             readBytes = 0;
-            if (path.Contains(":SSHFSProperty.Permission"))
-            {
-                if (offset == 0)
-                {
-                    string[] tmp = path.Split(new char[] { ':' });
-                    path = tmp[0];
-                    string str = ReadPermission(path);
-                    byte[] bytes = System.Text.Encoding.ASCII.GetBytes(str);
-                    int min = (buffer.Length < bytes.Length ? buffer.Length : bytes.Length);
-                    Array.Copy(bytes, buffer, min);
-                    readBytes = min;
-                    return NtStatus.Success;
-                }
-                else
-                {
-                    return NtStatus.Success;
-                }
-            }
+            //if (path.Contains(":SSHFSProperty.Permission"))
+            //{
+            //    if (offset == 0)
+            //    {
+            //        string[] tmp = path.Split(new char[] { ':' });
+            //        path = tmp[0];
+            //        string str = ReadPermission(path);
+            //        byte[] bytes = System.Text.Encoding.ASCII.GetBytes(str);
+            //        int min = (buffer.Length < bytes.Length ? buffer.Length : bytes.Length);
+            //        Array.Copy(bytes, buffer, min);
+            //        readBytes = min;
+            //        return NtStatus.Success;
+            //    }
+            //    else
+            //    {
+            //        return NtStatus.Success;
+            //    }
+            //}
 
             if (info.IsDirectory)
                 return NtStatus.Error;
 
-
             Debug("ReadFile {0} bufferLen {1} Offset {2}", filename, buffer.Length, offset);
             try
             {
-                ChannelSftp channel = GetChannel();
-                GetMonitor monitor = new GetMonitor(offset + buffer.Length);
-                GetStream stream = new GetStream(buffer);
-                channel.get(path, stream, monitor, ChannelSftp.RESUME, offset);
-                readBytes = stream.RecievedBytes;
+                var client = GetClient();
+                using (var stream = client.OpenRead(path))
+                {
+                    var position = stream.Seek(offset, SeekOrigin.Begin);
+                    readBytes = stream.Read(buffer, 0, buffer.Length);
+                }
+                //GetMonitor monitor = new GetMonitor(offset + buffer.Length);
+                //GetStream stream = new GetStream(buffer);
+                //client.get(path, stream, monitor, ChannelSftp.RESUME, offset);
+                //readBytes = stream.RecievedBytes;
                 Debug("  ReadFile readBytes: {0}", readBytes);
                 return NtStatus.Success;
             }
-            catch (SftpException)
-            {
-                return NtStatus.Error;
-            }
+            //catch (SftpException)
+            //{
+            //    return NtStatus.Error;
+            //}
             catch (Exception e)
             {
-                connectionError_ = true;
+                _connectionError = true;
                 Debug(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
             }
         }
 
-
-        class PutMonitor : SftpProgressMonitor
-        {
-            private long offset_;
-            public PutMonitor()
-            {
-                offset_ = 0;
-            }
-
-            public override bool count(long count)
-            {
-                offset_ += count;
-                //Console.Error.WriteLine("count = {0}, offset = {1}", count, offset_);
-                return true;
-            }
-
-            public override void end()
-            {
-                //Console.Error.WriteLine("end");
-            }
-
-            public override void init(int op, string src, string dest, long max)
-            {
-                //Console.Error.WriteLine("init file: {0} size: {1}", src, max);
-            }
-        }
-
-
-        private bool WritePermission(
-            string path,
-            int permission)
-        {
-            try
-            {
-                Debug("WritePermission {0}:{1}", path, Convert.ToString(permission, 8));
-                ChannelSftp channel = GetChannel();
-                SftpATTRS attr = channel.stat(path);
-                attr.setPERMISSIONS(permission);
-                channel.setStat(path, attr);
-            }
-            catch (SftpException)
-            {
-            }
-            catch (Exception e)
-            {
-                connectionError_ = true;
-                Debug(e.ToString());
-                Reconnect();
-            }
-            return true;
-        }
+        //private bool WritePermission(
+        //    string path,
+        //    int permission)
+        //{
+        //    try
+        //    {
+        //        Debug("WritePermission {0}:{1}", path, Convert.ToString(permission, 8));
+        //        var channel = GetClient();
+        //        var attr = channel.GetAttributes(path);
+        //        attr.setPERMISSIONS(permission);
+        //        channel.setStat(path, attr);
+        //    }
+        //    catch (SftpException)
+        //    {
+        //    }
+        //    catch (Exception e)
+        //    {
+        //        _connectionError = true;
+        //        Debug(e.ToString());
+        //        Reconnect();
+        //    }
+        //    return true;
+        //}
 
         public NtStatus WriteFile(
             string filename,
@@ -592,35 +492,36 @@ namespace DokanSSHFS
             DokanFileInfo info)
         {
             Debug("WriteFile {0} bufferLen {1} Offset {2}", filename, buffer.Length, offset);
-            
+
             string path = GetPath(filename);
 
             writtenBytes = 0;
-            if (path.Contains(":SSHFSProperty.Permission"))
-            {
-                if (offset == 0)
-                {
-                    string[] tmp = path.Split(new char[] { ':' });
-                    path = tmp[0];
-                    int permission = 0;
-                    permission = Convert.ToInt32(System.Text.Encoding.ASCII.GetString(buffer), 8);
-                    WritePermission(path, permission);
-                    writtenBytes = buffer.Length;
-                    return NtStatus.Success;
-                }
-                else
-                {
-                    return NtStatus.Success;
-                }
-            }
+            //if (path.Contains(":SSHFSProperty.Permission"))
+            //{
+            //    if (offset == 0)
+            //    {
+            //        string[] tmp = path.Split(new char[] { ':' });
+            //        path = tmp[0];
+            //        int permission = 0;
+            //        permission = Convert.ToInt32(System.Text.Encoding.ASCII.GetString(buffer), 8);
+            //        WritePermission(path, permission);
+            //        writtenBytes = buffer.Length;
+            //        return NtStatus.Success;
+            //    }
+            //    else
+            //    {
+            //        return NtStatus.Success;
+            //    }
+            //}
 
             try
             {
-                ChannelSftp channel = GetChannel();
+                var channel = GetClient();
+
                 //GetMonitor monitor = new GetMonitor(buffer.Length);
-                Tamir.SharpSsh.java.io.OutputStream stream = channel.put(path, null, 3/*HACK: 存在しないモード */, offset);
-                stream.Write(buffer, 0, buffer.Length);
-                stream.Close();
+                //Tamir.SharpSsh.java.io.OutputStream stream = channel.put(path, null, 3 /*HACK: 存在しないモード */, offset);
+                //stream.Write(buffer, 0, buffer.Length);
+                //stream.Close();
                 writtenBytes = buffer.Length;
                 return NtStatus.Success;
             }
@@ -652,31 +553,29 @@ namespace DokanSSHFS
             {
                 string path = GetPath(filename);
                 fileinfo.FileName = path;
-                SftpATTRS attr = GetChannel().stat(path);
+                var attr = GetClient().GetAttributes(path);
 
-                fileinfo.Attributes = attr.isDir() ?
+                fileinfo.Attributes = attr.IsDirectory ?
                     FileAttributes.Directory :
                     FileAttributes.Normal;
 
                 if (DokanSSHFS.UseOffline)
                     fileinfo.Attributes |= FileAttributes.Offline;
 
-                DateTime org = new DateTime(1970, 1, 1, 0, 0, 0, 0);
-
-                fileinfo.CreationTime = org.AddSeconds(attr.getMTime());
-                fileinfo.LastAccessTime = org.AddSeconds(attr.getATime());
-                fileinfo.LastWriteTime = org.AddSeconds(attr.getMTime());
-                fileinfo.Length = attr.getSize();
+                fileinfo.CreationTime = attr.LastWriteTime;
+                fileinfo.LastAccessTime = attr.LastAccessTime;
+                fileinfo.LastWriteTime = attr.LastWriteTime;
+                fileinfo.Length = attr.Size;
 
                 return NtStatus.Success;
             }
-            catch (SftpException)
+            catch (SftpPathNotFoundException)
             {
                 return NtStatus.Error;
             }
             catch (Exception e)
             {
-                connectionError_ = true;
+                _connectionError = true;
                 Debug(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
@@ -684,9 +583,9 @@ namespace DokanSSHFS
         }
 
         public NtStatus FindFilesWithPattern(
-            string fileName, 
-            string searchPattern, 
-            out IList<FileInformation> files, 
+            string fileName,
+            string searchPattern,
+            out IList<FileInformation> files,
             DokanFileInfo info)
         {
             files = new List<FileInformation>();
@@ -704,45 +603,43 @@ namespace DokanSSHFS
             try
             {
                 string path = GetPath(filename);
-                ArrayList entries = (ArrayList)GetChannel().ls(path);
+                var entries = GetClient().ListDirectory(path);
 
-                foreach (ChannelSftp.LsEntry entry in entries)
+                foreach (var entry in entries)
                 {
-
-                    FileInformation fi = new FileInformation();
-
-                    fi.Attributes = entry.getAttrs().isDir() ?
-                        FileAttributes.Directory :
-                        FileAttributes.Normal;
-
-                    if (DokanSSHFS.UseOffline)
-                        fi.Attributes |= FileAttributes.Offline;
-
-                    DateTime org = new DateTime(1970, 1, 1, 0, 0, 0, 0);
-
-                    fi.CreationTime = org.AddSeconds(entry.getAttrs().getMTime());
-                    fi.LastAccessTime = org.AddSeconds(entry.getAttrs().getATime());
-                    fi.LastWriteTime = org.AddSeconds(entry.getAttrs().getMTime());
-                    fi.Length = entry.getAttrs().getSize();
-                    //fi.FileName = System.Text.Encoding.UTF8.GetString(entry.getFilename().getBytes());
-                    fi.FileName = entry.getFilename();
+                    FileInformation fi = new FileInformation()
+                    {
+                        Attributes = entry.IsDirectory ?
+                            FileAttributes.Directory :
+                            FileAttributes.Normal,
+                        CreationTime = entry.LastWriteTime,
+                        LastAccessTime = entry.LastAccessTime,
+                        LastWriteTime = entry.LastWriteTime,
+                        Length = entry.Length,
+                        FileName = entry.Name
+                    };
 
                     if (fi.FileName.StartsWith("."))
                     {
                         fi.Attributes |= FileAttributes.Hidden;
                     }
+
+                    if (DokanSSHFS.UseOffline)
+                        fi.Attributes |= FileAttributes.Offline;
+
+
                     files.Add(fi);
                 }
                 return NtStatus.Success;
 
             }
-            catch (SftpException)
+            catch (SftpPermissionDeniedException)
             {
                 return NtStatus.Error;
             }
             catch (Exception e)
             {
-                connectionError_ = true;
+                _connectionError = true;
                 Debug(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
@@ -763,23 +660,24 @@ namespace DokanSSHFS
             Debug("SetFileAttributes {0}", filename);
             try
             {
+                // Nothing to do here?
                 string path = GetPath(filename);
-                ChannelSftp channel = GetChannel();
-                SftpATTRS sattr = channel.stat(path);
+                var channel = GetClient();
+                var sattr = channel.GetAttributes(path);
 
-                int permissions = sattr.getPermissions();
-                Debug(" permissons {0} {1}", permissions, sattr.getPermissionsString());
-                sattr.setPERMISSIONS(permissions);
-                channel.setStat(path, sattr);
+                //int permissions = sattr.getPermissions();
+                //Debug(" permissons {0} {1}", permissions, sattr.getPermissionsString());
+                //sattr.setPERMISSIONS(permissions);
+                //channel.setStat(path, sattr);
                 return NtStatus.Success;
             }
-            catch (SftpException)
+            catch (SftpPathNotFoundException)
             {
                 return NtStatus.Error;
             }
-            catch (Exception e)
+            catch (SshConnectionException e)
             {
-                connectionError_ = true;
+                _connectionError = true;
                 Debug(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
@@ -799,31 +697,29 @@ namespace DokanSSHFS
                 Debug(" filetime {0} {1} {2}", ctime.HasValue ? ctime.ToString() : "-", atime.HasValue ? atime.ToString() : "-", mtime.HasValue ? mtime.ToString() : "-");
 
                 string path = GetPath(filename);
-                ChannelSftp channel = GetChannel();
-                SftpATTRS attr = channel.stat(path);
+                var client = GetClient();
 
-                TimeSpan at = (atime.GetValueOrDefault(DateTime.MinValue) - new DateTime(1970, 1, 1, 0, 0, 0));
-                TimeSpan mt = (mtime.GetValueOrDefault(DateTime.MinValue) - new DateTime(1970, 1, 1, 0, 0, 0));
+                if (atime.HasValue)
+                {
+                    // Not yet implemented
+                    // client.SetLastAccessTime(path, atime.Value);
+                }
 
-                int uat = (int)at.TotalSeconds;
-                int umt = (int)mt.TotalSeconds;
+                if (mtime.HasValue)
+                {
+                    // Not yet implemented
+                    // client.SetLastWriteTime(path, atime.Value);
+                }
 
-                if (mtime == DateTime.MinValue)
-                    umt = attr.getMTime();
-                if (atime == DateTime.MinValue)
-                    uat = attr.getATime();
-
-                attr.setACMODTIME(uat, umt);
-                channel.setStat(path, attr);
                 return NtStatus.Success;
             }
-            catch (SftpException)
+            catch (SftpPathNotFoundException)
             {
                 return NtStatus.Error;
             }
-            catch (Exception e)
+            catch (SshConnectionException e)
             {
-                connectionError_ = true;
+                _connectionError = true;
                 Debug(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
@@ -838,17 +734,21 @@ namespace DokanSSHFS
             try
             {
                 string path = GetPath(filename);
-                ChannelSftp channel = GetChannel();
-                channel.rm(path);
+                var client = GetClient();
+                client.DeleteFile(path);
                 return NtStatus.Success;
             }
-            catch (SftpException)
+            catch (SftpPathNotFoundException)
             {
                 return NtStatus.Error;
             }
-            catch (Exception e)
+            catch (SftpPermissionDeniedException)
             {
-                connectionError_ = true;
+                return NtStatus.Error;
+            }
+            catch (SshConnectionException e)
+            {
+                _connectionError = true;
                 Debug(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
@@ -863,17 +763,21 @@ namespace DokanSSHFS
             try
             {
                 string path = GetPath(filename);
-                ChannelSftp channel = GetChannel();
-                channel.rmdir(path);
+                var channel = GetClient();
+                channel.DeleteDirectory(path);
                 return NtStatus.Success;
             }
-            catch (SftpException)
+            catch (SftpPathNotFoundException)
             {
                 return NtStatus.Error;
             }
-            catch (Exception e)
+            catch (SftpPermissionDeniedException)
             {
-                connectionError_ = true;
+                return NtStatus.Error;
+            }
+            catch (SshConnectionException e)
+            {
+                _connectionError = true;
                 Debug(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
@@ -891,17 +795,17 @@ namespace DokanSSHFS
             {
                 string oldPath = GetPath(filename);
                 string newPath = GetPath(newname);
-                ChannelSftp channel = GetChannel();
-                channel.rename(oldPath, newPath);
+                var client = GetClient();
+                client.RenameFile(oldPath, newPath);
                 return NtStatus.Success;
             }
-            catch (SftpException)
+            catch (SftpPermissionDeniedException)
             {
                 return NtStatus.Error;
             }
-            catch (Exception e)
+            catch (SshConnectionException e)
             {
-                connectionError_ = true;
+                _connectionError = true;
                 Debug(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
@@ -915,22 +819,20 @@ namespace DokanSSHFS
         {
             try
             {
-                string path = GetPath(filename);             
-                ChannelSftp channel = GetChannel();
-                SftpATTRS attr = channel.stat(path);
-
-                attr.setSIZE(length);
-                channel.setStat(path, attr);
+                string path = GetPath(filename);
+                var channel = GetClient();
+                var attr = channel.GetAttributes(path);
+                attr.Size = length;
 
                 return NtStatus.Success;
             }
-            catch (SftpException)
+            catch (SftpPathNotFoundException)
             {
                 return NtStatus.Error;
             }
-            catch (Exception e)
+            catch (SshConnectionException e)
             {
-                connectionError_ = true;
+                _connectionError = true;
                 Debug(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
@@ -942,21 +844,20 @@ namespace DokanSSHFS
             try
             {
                 string path = GetPath(filename);
-                ChannelSftp channel = GetChannel();
-                SftpATTRS attr = channel.stat(path);
-                if (attr.getSize() < length)
+                var channel = GetClient();
+                var attr = channel.GetAttributes(path);
+                if (attr.Size < length)
                 {
-                    attr.setSIZE(length);
+                    attr.Size = length;
                 }
-                channel.setStat(path, attr);
             }
-            catch (SftpException)
+            catch (SftpPathNotFoundException)
             {
                 return NtStatus.Error;
             }
-            catch (Exception e)
+            catch (SshConnectionException e)
             {
-                connectionError_ = true;
+                _connectionError = true;
                 Debug(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
@@ -1007,16 +908,11 @@ namespace DokanSSHFS
             {
                 Debug("disconnection...");
 
-                GetChannel().exit();
+                GetClient().Disconnect();
 
                 Thread.Sleep(1000 * 1);
 
-                foreach (KeyValuePair<int, ChannelSftp> kv in channels_)
-                {
-                    kv.Value.disconnect();
-                }
-
-                session_.disconnect();
+                //session_.disconnect();
 
                 Debug("disconnected");
             }
