@@ -6,6 +6,7 @@ using DokanNet;
 using System.Linq;
 using System.Text.RegularExpressions;
 using SshFileSystem;
+using System.Threading.Tasks;
 
 namespace SshFileSystem.WinForms
 {
@@ -17,6 +18,7 @@ namespace SshFileSystem.WinForms
         private StoredPresets _storedPresets = new StoredPresets();
         private Thread _fileSystemThread;
         private bool _isUnmounted = false;
+        private bool _isExiting = false;
 
         public frmMain()
         {
@@ -60,7 +62,7 @@ namespace SshFileSystem.WinForms
             }
         }
 
-        private void Connect_Click(object sender, EventArgs e)
+        private async void Connect_Click(object sender, EventArgs e)
         {
             int port = 22;
             
@@ -115,8 +117,7 @@ namespace SshFileSystem.WinForms
 
             if (message.Length != 0)
             {
-                Show();
-                MessageBox.Show(message, "Error");
+                MessageBox.Show(message);
                 return;
             }
 
@@ -139,6 +140,8 @@ namespace SshFileSystem.WinForms
                 txtPath.Text,
                 volumeLabel);
 
+            lblStatus.Text = "Connecting...";
+
             if (_sshfs.SSHConnect())
             {
                 _isUnmounted = false;
@@ -150,12 +153,23 @@ namespace SshFileSystem.WinForms
             }
             else
             {
-                Show();
-                MessageBox.Show("failed to connect", "Error");
+                lblStatus.Text = "Failed to connect.";
                 return;
             }
 
-            MessageBox.Show("sshfs start", "info");
+            lblStatus.Text = "Connection successful.";
+
+            await Task.Delay(500);
+
+            btnMount.Enabled = _isUnmounted;
+            btnUnmount.Enabled = !_isUnmounted;
+
+            try
+            {
+                // Try to open an explorer window (might not be available just after mounting the fs)
+                Process.Start(_mountPoint);
+            }
+            catch { }
         }
         
         private void Unmount()
@@ -167,12 +181,13 @@ namespace SshFileSystem.WinForms
                 try
                 {
                     Dokan.RemoveMountPoint(_mountPoint);
-                    Debug.WriteLine("DokanReveMountPoint success\n");
+                    Debug.WriteLine("DokanReveMountPoint success");
                 }
                 catch (DokanException ex)
                 {
-                    Debug.WriteLine("DokanRemoveMountPoint failed: " + ex.Message + "\n");
+                    Debug.WriteLine("DokanRemoveMountPoint failed: " + ex.Message);
                 }
+
                 // This should be called from Dokan, but not called.
                 // Call here explicitly.
                 _sshfs.Unmounted(null);
@@ -181,30 +196,19 @@ namespace SshFileSystem.WinForms
         
         private void btnExit_Click(object sender, EventArgs e)
         {
-            if (!_isUnmounted)
-            {
-                Unmount();
-                _isUnmounted = true;
-            }
-
-            Debug.WriteLine("SSHFS Thread Waiting");
-
-            if (_fileSystemThread != null && _fileSystemThread.IsAlive)
-            {
-                Debug.WriteLine("doka.Join");
-                _fileSystemThread.Join();
-            }
-            
-            Debug.WriteLine("SSHFS Thread End");
-
+            _isExiting = true;
             Application.Exit();
         }
         
         private void btnUnmount_Click(object sender, EventArgs e)
         {
-            Debug.WriteLine("unmount_Click");
             Unmount();
             _isUnmounted = true;
+
+            btnMount.Enabled = _isUnmounted;
+            btnUnmount.Enabled = !_isUnmounted;
+
+            lblStatus.Text = "Ready";
         }
 
         private void btnSave_Click(object sender, EventArgs e)
@@ -237,7 +241,8 @@ namespace SshFileSystem.WinForms
 
             _storedPresets.Save();
 
-            cmbSelectedPreset.Items.Add(_storedPresets.GetNewName());
+            if (cmbSelectedPreset.Items.Count == _storedPresets.Presets.Count)
+                cmbSelectedPreset.Items.Add(_storedPresets.GetNewName());
         }
 
         private void cmbSelectedPreset_SelectedIndexChanged(object sender, EventArgs e)
@@ -288,6 +293,34 @@ namespace SshFileSystem.WinForms
         private void btnMount_Click(object sender, EventArgs e)
         {
             Show();
+        }
+
+        private void frmMain_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            if (!_isUnmounted)
+            {
+                Unmount();
+                _isUnmounted = true;
+            }
+
+            Debug.WriteLine("SSHFS Thread Waiting");
+
+            if (_fileSystemThread != null && _fileSystemThread.IsAlive)
+            {
+                Debug.WriteLine("doka.Join");
+                _fileSystemThread.Join();
+            }
+
+            Debug.WriteLine("SSHFS Thread End");
+        }
+
+        private void frmMain_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (!_isUnmounted && !_isExiting)
+            {
+                e.Cancel = true;
+                WindowState = FormWindowState.Minimized;
+            }
         }
     }
 }

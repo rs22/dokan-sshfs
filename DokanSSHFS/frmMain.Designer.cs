@@ -30,7 +30,7 @@
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(frmMain));
             this.openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
-            this.btnConnect = new System.Windows.Forms.Button();
+            this.btnMount = new System.Windows.Forms.Button();
             this.btnExit = new System.Windows.Forms.Button();
             this.btnSavePreset = new System.Windows.Forms.Button();
             this.btnRemovePreset = new System.Windows.Forms.Button();
@@ -55,31 +55,36 @@
             this.cmbDriveLetter = new System.Windows.Forms.ComboBox();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
+            this.flowLayoutPanel1 = new System.Windows.Forms.FlowLayoutPanel();
             this.btnUnmount = new System.Windows.Forms.Button();
+            this.statusStrip1 = new System.Windows.Forms.StatusStrip();
+            this.lblStatus = new System.Windows.Forms.ToolStripStatusLabel();
             this.tableLayoutPanel1.SuspendLayout();
             this.groupBox1.SuspendLayout();
+            this.flowLayoutPanel1.SuspendLayout();
+            this.statusStrip1.SuspendLayout();
             this.SuspendLayout();
             // 
             // openFileDialog1
             // 
             this.openFileDialog1.FileName = "openFileDialog1";
             // 
-            // btnConnect
+            // btnMount
             // 
-            this.btnConnect.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnConnect.Location = new System.Drawing.Point(120, 248);
-            this.btnConnect.Name = "btnConnect";
-            this.btnConnect.Size = new System.Drawing.Size(75, 25);
-            this.btnConnect.TabIndex = 0;
-            this.btnConnect.Text = "Mount";
-            this.btnConnect.UseVisualStyleBackColor = true;
-            this.btnConnect.Click += new System.EventHandler(this.Connect_Click);
+            this.btnMount.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnMount.Location = new System.Drawing.Point(120, 249);
+            this.btnMount.Name = "btnMount";
+            this.btnMount.Size = new System.Drawing.Size(75, 25);
+            this.btnMount.TabIndex = 0;
+            this.btnMount.Text = "Mount";
+            this.btnMount.UseVisualStyleBackColor = true;
+            this.btnMount.Click += new System.EventHandler(this.Connect_Click);
             // 
             // btnExit
             // 
             this.btnExit.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnExit.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.btnExit.Location = new System.Drawing.Point(282, 248);
+            this.btnExit.Location = new System.Drawing.Point(282, 249);
             this.btnExit.Name = "btnExit";
             this.btnExit.Size = new System.Drawing.Size(75, 25);
             this.btnExit.TabIndex = 1;
@@ -89,9 +94,10 @@
             // 
             // btnSavePreset
             // 
-            this.btnSavePreset.Location = new System.Drawing.Point(228, 3);
+            this.btnSavePreset.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.btnSavePreset.Location = new System.Drawing.Point(218, 3);
             this.btnSavePreset.Name = "btnSavePreset";
-            this.btnSavePreset.Size = new System.Drawing.Size(53, 19);
+            this.btnSavePreset.Size = new System.Drawing.Size(54, 19);
             this.btnSavePreset.TabIndex = 6;
             this.btnSavePreset.Text = "Save";
             this.btnSavePreset.UseVisualStyleBackColor = true;
@@ -99,9 +105,10 @@
             // 
             // btnRemovePreset
             // 
-            this.btnRemovePreset.Location = new System.Drawing.Point(288, 3);
+            this.btnRemovePreset.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.btnRemovePreset.Location = new System.Drawing.Point(278, 3);
             this.btnRemovePreset.Name = "btnRemovePreset";
-            this.btnRemovePreset.Size = new System.Drawing.Size(53, 19);
+            this.btnRemovePreset.Size = new System.Drawing.Size(64, 19);
             this.btnRemovePreset.TabIndex = 7;
             this.btnRemovePreset.Text = "Remove";
             this.btnRemovePreset.UseVisualStyleBackColor = true;
@@ -114,7 +121,7 @@
             "New Setting"});
             this.cmbSelectedPreset.Location = new System.Drawing.Point(63, 3);
             this.cmbSelectedPreset.Name = "cmbSelectedPreset";
-            this.cmbSelectedPreset.Size = new System.Drawing.Size(159, 21);
+            this.cmbSelectedPreset.Size = new System.Drawing.Size(149, 21);
             this.cmbSelectedPreset.TabIndex = 0;
             this.cmbSelectedPreset.SelectedIndexChanged += new System.EventHandler(this.cmbSelectedPreset_SelectedIndexChanged);
             // 
@@ -133,7 +140,7 @@
             // 
             this.label4.AutoSize = true;
             this.label4.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.label4.Location = new System.Drawing.Point(3, 185);
+            this.label4.Location = new System.Drawing.Point(3, 186);
             this.label4.Margin = new System.Windows.Forms.Padding(3, 5, 3, 0);
             this.label4.Name = "label4";
             this.label4.Size = new System.Drawing.Size(54, 20);
@@ -143,7 +150,7 @@
             // txtPath
             // 
             this.tableLayoutPanel1.SetColumnSpan(this.txtPath, 3);
-            this.txtPath.Location = new System.Drawing.Point(63, 183);
+            this.txtPath.Location = new System.Drawing.Point(63, 184);
             this.txtPath.Name = "txtPath";
             this.txtPath.Size = new System.Drawing.Size(279, 20);
             this.txtPath.TabIndex = 4;
@@ -193,7 +200,7 @@
             // 
             this.label5.AutoSize = true;
             this.label5.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.label5.Location = new System.Drawing.Point(3, 210);
+            this.label5.Location = new System.Drawing.Point(3, 211);
             this.label5.Margin = new System.Windows.Forms.Padding(3, 5, 3, 0);
             this.label5.Name = "label5";
             this.label5.Size = new System.Drawing.Size(54, 20);
@@ -204,7 +211,7 @@
             // 
             this.txtUser.Location = new System.Drawing.Point(63, 53);
             this.txtUser.Name = "txtUser";
-            this.txtUser.Size = new System.Drawing.Size(159, 20);
+            this.txtUser.Size = new System.Drawing.Size(149, 20);
             this.txtUser.TabIndex = 3;
             // 
             // btnOpenPrivateKey
@@ -231,7 +238,7 @@
             // 
             // txtPort
             // 
-            this.txtPort.Location = new System.Drawing.Point(288, 28);
+            this.txtPort.Location = new System.Drawing.Point(222, 3);
             this.txtPort.Name = "txtPort";
             this.txtPort.Size = new System.Drawing.Size(54, 20);
             this.txtPort.TabIndex = 2;
@@ -247,11 +254,10 @@
             // label2
             // 
             this.label2.AutoSize = true;
-            this.label2.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.label2.Location = new System.Drawing.Point(228, 30);
+            this.label2.Location = new System.Drawing.Point(190, 5);
             this.label2.Margin = new System.Windows.Forms.Padding(3, 5, 3, 0);
             this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(54, 20);
+            this.label2.Size = new System.Drawing.Size(26, 13);
             this.label2.TabIndex = 2;
             this.label2.Text = "Port";
             // 
@@ -266,9 +272,9 @@
             // 
             // txtHost
             // 
-            this.txtHost.Location = new System.Drawing.Point(63, 28);
+            this.txtHost.Location = new System.Drawing.Point(3, 3);
             this.txtHost.Name = "txtHost";
-            this.txtHost.Size = new System.Drawing.Size(159, 20);
+            this.txtHost.Size = new System.Drawing.Size(181, 20);
             this.txtHost.TabIndex = 1;
             // 
             // label1
@@ -312,7 +318,7 @@
             "X",
             "Y",
             "Z"});
-            this.cmbDriveLetter.Location = new System.Drawing.Point(63, 208);
+            this.cmbDriveLetter.Location = new System.Drawing.Point(63, 209);
             this.cmbDriveLetter.Name = "cmbDriveLetter";
             this.cmbDriveLetter.Size = new System.Drawing.Size(53, 21);
             this.cmbDriveLetter.TabIndex = 5;
@@ -327,9 +333,8 @@
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 60F));
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 60F));
-            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 60F));
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 70F));
             this.tableLayoutPanel1.Controls.Add(this.cmbDriveLetter, 1, 5);
-            this.tableLayoutPanel1.Controls.Add(this.txtHost, 1, 1);
             this.tableLayoutPanel1.Controls.Add(this.label7, 0, 0);
             this.tableLayoutPanel1.Controls.Add(this.btnRemovePreset, 3, 0);
             this.tableLayoutPanel1.Controls.Add(this.label5, 0, 5);
@@ -337,12 +342,11 @@
             this.tableLayoutPanel1.Controls.Add(this.btnSavePreset, 2, 0);
             this.tableLayoutPanel1.Controls.Add(this.txtPath, 1, 4);
             this.tableLayoutPanel1.Controls.Add(this.label1, 0, 1);
-            this.tableLayoutPanel1.Controls.Add(this.txtPort, 3, 1);
             this.tableLayoutPanel1.Controls.Add(this.label4, 0, 4);
             this.tableLayoutPanel1.Controls.Add(this.label3, 0, 2);
             this.tableLayoutPanel1.Controls.Add(this.txtUser, 1, 2);
-            this.tableLayoutPanel1.Controls.Add(this.label2, 2, 1);
             this.tableLayoutPanel1.Controls.Add(this.groupBox1, 0, 3);
+            this.tableLayoutPanel1.Controls.Add(this.flowLayoutPanel1, 1, 1);
             this.tableLayoutPanel1.Location = new System.Drawing.Point(12, 12);
             this.tableLayoutPanel1.Name = "tableLayoutPanel1";
             this.tableLayoutPanel1.RowCount = 6;
@@ -352,7 +356,7 @@
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 25F));
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 25F));
-            this.tableLayoutPanel1.Size = new System.Drawing.Size(345, 230);
+            this.tableLayoutPanel1.Size = new System.Drawing.Size(345, 231);
             this.tableLayoutPanel1.TabIndex = 25;
             // 
             // groupBox1
@@ -368,15 +372,29 @@
             this.groupBox1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.groupBox1.Location = new System.Drawing.Point(3, 78);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(339, 99);
+            this.groupBox1.Size = new System.Drawing.Size(339, 100);
             this.groupBox1.TabIndex = 9;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "Identity";
             // 
+            // flowLayoutPanel1
+            // 
+            this.tableLayoutPanel1.SetColumnSpan(this.flowLayoutPanel1, 3);
+            this.flowLayoutPanel1.Controls.Add(this.txtHost);
+            this.flowLayoutPanel1.Controls.Add(this.label2);
+            this.flowLayoutPanel1.Controls.Add(this.txtPort);
+            this.flowLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.flowLayoutPanel1.Location = new System.Drawing.Point(60, 25);
+            this.flowLayoutPanel1.Margin = new System.Windows.Forms.Padding(0);
+            this.flowLayoutPanel1.Name = "flowLayoutPanel1";
+            this.flowLayoutPanel1.Size = new System.Drawing.Size(285, 25);
+            this.flowLayoutPanel1.TabIndex = 25;
+            // 
             // btnUnmount
             // 
             this.btnUnmount.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnUnmount.Location = new System.Drawing.Point(201, 248);
+            this.btnUnmount.Enabled = false;
+            this.btnUnmount.Location = new System.Drawing.Point(201, 249);
             this.btnUnmount.Name = "btnUnmount";
             this.btnUnmount.Size = new System.Drawing.Size(75, 25);
             this.btnUnmount.TabIndex = 26;
@@ -384,35 +402,60 @@
             this.btnUnmount.UseVisualStyleBackColor = true;
             this.btnUnmount.Click += new System.EventHandler(this.btnUnmount_Click);
             // 
+            // statusStrip1
+            // 
+            this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.lblStatus});
+            this.statusStrip1.Location = new System.Drawing.Point(0, 277);
+            this.statusStrip1.Name = "statusStrip1";
+            this.statusStrip1.Size = new System.Drawing.Size(369, 22);
+            this.statusStrip1.SizingGrip = false;
+            this.statusStrip1.TabIndex = 27;
+            // 
+            // lblStatus
+            // 
+            this.lblStatus.Name = "lblStatus";
+            this.lblStatus.Size = new System.Drawing.Size(39, 17);
+            this.lblStatus.Text = "Ready";
+            // 
             // frmMain
             // 
-            this.AcceptButton = this.btnConnect;
+            this.AcceptButton = this.btnMount;
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.CancelButton = this.btnExit;
-            this.ClientSize = new System.Drawing.Size(369, 285);
+            this.ClientSize = new System.Drawing.Size(369, 299);
+            this.Controls.Add(this.statusStrip1);
             this.Controls.Add(this.btnUnmount);
             this.Controls.Add(this.tableLayoutPanel1);
             this.Controls.Add(this.btnExit);
-            this.Controls.Add(this.btnConnect);
+            this.Controls.Add(this.btnMount);
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "frmMain";
             this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Hide;
             this.Text = "SSHFS";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.frmMain_FormClosing);
+            this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.frmMain_FormClosed);
             this.Load += new System.EventHandler(this.frmMain_Load);
             this.tableLayoutPanel1.ResumeLayout(false);
             this.tableLayoutPanel1.PerformLayout();
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();
+            this.flowLayoutPanel1.ResumeLayout(false);
+            this.flowLayoutPanel1.PerformLayout();
+            this.statusStrip1.ResumeLayout(false);
+            this.statusStrip1.PerformLayout();
             this.ResumeLayout(false);
+            this.PerformLayout();
 
         }
 
         #endregion
         private System.Windows.Forms.OpenFileDialog openFileDialog1;
-        private System.Windows.Forms.Button btnConnect;
+        private System.Windows.Forms.Button btnMount;
         private System.Windows.Forms.Button btnExit;
         private System.Windows.Forms.Button btnSavePreset;
         private System.Windows.Forms.Button btnRemovePreset;
@@ -438,5 +481,8 @@
         private System.Windows.Forms.RadioButton usePrivateKey;
         private System.Windows.Forms.Button btnOpenPrivateKey;
         private System.Windows.Forms.Button btnUnmount;
+        private System.Windows.Forms.FlowLayoutPanel flowLayoutPanel1;
+        private System.Windows.Forms.StatusStrip statusStrip1;
+        private System.Windows.Forms.ToolStripStatusLabel lblStatus;
     }
 }

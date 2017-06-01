@@ -55,7 +55,7 @@ namespace SshFileSystem.WinForms
 
         private static string GetSettingsFile()
         {
-            return Application.UserAppDataPath + "\\setting.xml";
+            return Path.Combine(Application.UserAppDataPath, "presets.xml");
         }
 
         public void Load()

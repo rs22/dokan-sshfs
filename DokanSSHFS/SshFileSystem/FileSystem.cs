@@ -108,7 +108,7 @@ namespace SshFileSystem
 
         private string GetPath(string filename)
         {
-            string path = /*_root +*/ filename.Replace('\\', '/').TrimStart('/');
+            var path = filename.Replace('\\', '/').TrimStart('/');
             DebugWrite("GetPath : {0} thread {1}", path, Thread.CurrentThread.ManagedThreadId);
             //Debug("  Stack {0}", new System.Diagnostics.StackTrace().ToString());
             return path;
