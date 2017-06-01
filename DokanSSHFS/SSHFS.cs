@@ -9,6 +9,7 @@ using System.Security.AccessControl;
 using Renci.SshNet;
 using Renci.SshNet.Common;
 using System.Diagnostics;
+using System.Linq;
 
 namespace DokanSSHFS
 {
@@ -17,6 +18,7 @@ namespace DokanSSHFS
         private object _sessionLock = new Object();
         private SftpClient _client;
 
+        private string _volumeLabel;
         private string _user;
         private string _host;
         private int _port;
@@ -29,7 +31,7 @@ namespace DokanSSHFS
         private bool _connectionError = false;
         private object _reconnectLock = new object();
 
-        public void Initialize(string user, string host, int port, string password, string identity, string passphrase, string root)
+        public void Initialize(string user, string host, int port, string password, string identity, string passphrase, string root, string volumeLabel)
         {
             _user = user;
             _host = host;
@@ -39,6 +41,7 @@ namespace DokanSSHFS
             _passphrase = passphrase;
 
             _root = root;
+            _volumeLabel = volumeLabel;
         }
 
         private void DebugWrite(string format, params object[] args)
@@ -49,15 +52,15 @@ namespace DokanSSHFS
             }
         }
 
-        internal bool SSHConnect()
+        public bool SSHConnect()
         {
             try
             {
-                var credentials = !string.IsNullOrEmpty(_password) 
+                var credentials = !string.IsNullOrEmpty(_password)
                     ? (AuthenticationMethod)new PasswordAuthenticationMethod(_user, _password)
                     : new PrivateKeyAuthenticationMethod(_user, new PrivateKeyFile(_identity, _passphrase));
                 var connectionInfo = new ConnectionInfo(_host, _port, _user, credentials);
-                
+
                 _client = new SftpClient(connectionInfo);
                 _client.Connect();
                 return true;
@@ -106,7 +109,7 @@ namespace DokanSSHFS
 
         private string GetPath(string filename)
         {
-            string path = _root + filename.Replace('\\', '/');
+            string path = /*_root +*/ filename.Replace('\\', '/').TrimStart('/');
             DebugWrite("GetPath : {0} thread {1}", path, Thread.CurrentThread.ManagedThreadId);
             //Debug("  Stack {0}", new System.Diagnostics.StackTrace().ToString());
             return path;
@@ -181,13 +184,14 @@ namespace DokanSSHFS
                             }
                             else
                             {
-                                return NtStatus.ObjectPathNotFound; // TODO: return not directory?
+                                DebugWrite("Not a Directory");
+                                return NtStatus.NotADirectory;
                             }
                         }
                         catch (SftpPathNotFoundException e)
                         {
                             DebugWrite(e.ToString());
-                            return NtStatus.ObjectPathNotFound;
+                            return NtStatus.ObjectNameNotFound;
                         }
                         catch (SshConnectionException e)
                         {
@@ -210,7 +214,7 @@ namespace DokanSSHFS
                         catch (SftpPermissionDeniedException e)
                         {
                             DebugWrite(e.ToString());
-                            return NtStatus.Error;
+                            return NtStatus.AccessDenied;
                         }
                         catch (SshConnectionException e)
                         {
@@ -231,9 +235,6 @@ namespace DokanSSHFS
                 try
                 {
                     var client = GetClient();
-
-                    if (CheckAltStream(path))
-                        return NtStatus.Success;
 
                     switch (mode)
                     {
@@ -319,12 +320,14 @@ namespace DokanSSHFS
             string filename,
             DokanFileInfo info)
         {
+            DebugWrite("Cleanup");
         }
 
         public void CloseFile(
             string filename,
             DokanFileInfo info)
         {
+            DebugWrite("CloseFile");
         }
 
 
@@ -417,13 +420,13 @@ namespace DokanSSHFS
 
             try
             {
-                var channel = GetClient();
-
-                //GetMonitor monitor = new GetMonitor(buffer.Length);
-                //Tamir.SharpSsh.java.io.OutputStream stream = channel.put(path, null, 3 /*HACK: ë∂ç›ÇµÇ»Ç¢ÉÇÅ[Éh */, offset);
-                //stream.Write(buffer, 0, buffer.Length);
-                //stream.Close();
-                writtenBytes = buffer.Length;
+                var client = GetClient();
+                using (var stream = client.OpenWrite(path))
+                {
+                    stream.Seek(offset, SeekOrigin.Begin);
+                    stream.Write(buffer, 0, buffer.Length);
+                    writtenBytes = buffer.Length;
+                }
                 return NtStatus.Success;
             }
             catch (IOException)
@@ -441,6 +444,7 @@ namespace DokanSSHFS
             string filename,
             DokanFileInfo info)
         {
+            DebugWrite("FlushFileBuffers");
             return NtStatus.Success;
         }
 
@@ -449,6 +453,7 @@ namespace DokanSSHFS
             out FileInformation fileinfo,
             DokanFileInfo info)
         {
+            DebugWrite("GetFileInformation");
             fileinfo = new FileInformation();
             try
             {
@@ -472,6 +477,49 @@ namespace DokanSSHFS
             }
             catch (SftpPathNotFoundException)
             {
+                return NtStatus.ObjectNameNotFound;
+            }
+            catch (Exception e)
+            {
+                _connectionError = true;
+                DebugWrite(e.ToString());
+                Reconnect();
+                return NtStatus.Error;
+            }
+        }
+
+        public IList<FileInformation> FindFilesHelper(string fileName, string searchPattern)
+        {
+            string path = GetPath(fileName);
+            var entries = GetClient().ListDirectory(path);
+
+            return entries
+                .Where(x => DokanHelper.DokanIsNameInExpression(searchPattern, x.Name, true))
+                .Select(x => new FileInformation
+                {
+                    Attributes = x.IsDirectory ?
+                            FileAttributes.Directory :
+                            FileAttributes.Normal,
+                    CreationTime = DateTime.MinValue,
+                    LastAccessTime = x.LastAccessTime,
+                    LastWriteTime = x.LastWriteTime,
+                    Length = x.Length,
+                    FileName = x.Name
+                }).ToList();
+        }
+
+        public NtStatus FindFilesWithPattern(string fileName, string searchPattern, out IList<FileInformation> files, DokanFileInfo info)
+        {
+            DebugWrite("FindFiles {0}", fileName);
+
+            files = null;
+            try
+            {
+                files = FindFilesHelper(fileName, searchPattern);
+                return NtStatus.Success;
+            }
+            catch (SftpPermissionDeniedException)
+            {
                 return NtStatus.Error;
             }
             catch (Exception e)
@@ -483,55 +531,15 @@ namespace DokanSSHFS
             }
         }
 
-        public NtStatus FindFilesWithPattern(
-            string fileName,
-            string searchPattern,
-            out IList<FileInformation> files,
-            DokanFileInfo info)
+        public NtStatus FindFiles(string fileName, out IList<FileInformation> files, DokanFileInfo info)
         {
-            files = new List<FileInformation>();
-            return NtStatus.NotImplemented;
-        }
+            DebugWrite("FindFiles {0}", fileName);
 
-        public NtStatus FindFiles(
-            string filename,
-            out IList<FileInformation> files,
-            DokanFileInfo info)
-        {
-            DebugWrite("FindFiles {0}", filename);
-
-            files = new List<FileInformation>();
+            files = null;
             try
             {
-                string path = GetPath(filename);
-                var entries = GetClient().ListDirectory(path);
-
-                foreach (var entry in entries)
-                {
-                    FileInformation fi = new FileInformation()
-                    {
-                        Attributes = entry.IsDirectory ?
-                            FileAttributes.Directory :
-                            FileAttributes.Normal,
-                        CreationTime = entry.LastWriteTime,
-                        LastAccessTime = entry.LastAccessTime,
-                        LastWriteTime = entry.LastWriteTime,
-                        Length = entry.Length,
-                        FileName = entry.Name
-                    };
-
-                    if (fi.FileName.StartsWith("."))
-                    {
-                        fi.Attributes |= FileAttributes.Hidden;
-                    }
-
-                    //if (DokanSSHFS.UseOffline)
-                    //    fi.Attributes |= FileAttributes.Offline;
-                    
-                    files.Add(fi);
-                }
+                files = FindFilesHelper(fileName, "*");
                 return NtStatus.Success;
-
             }
             catch (SftpPermissionDeniedException)
             {
@@ -548,6 +556,7 @@ namespace DokanSSHFS
 
         public NtStatus FindStreams(string fileName, out IList<FileInformation> streams, DokanFileInfo info)
         {
+            DebugWrite("FindStreams not implemented");
             streams = new List<FileInformation>();
             return NtStatus.NotImplemented;
         }
@@ -560,20 +569,16 @@ namespace DokanSSHFS
             DebugWrite("SetFileAttributes {0}", filename);
             try
             {
-                // Nothing to do here?
+                // TODO: Nothing to do here?
                 string path = GetPath(filename);
                 var channel = GetClient();
                 var sattr = channel.GetAttributes(path);
 
-                //int permissions = sattr.getPermissions();
-                //Debug(" permissons {0} {1}", permissions, sattr.getPermissionsString());
-                //sattr.setPERMISSIONS(permissions);
-                //channel.setStat(path, sattr);
                 return NtStatus.Success;
             }
             catch (SftpPathNotFoundException)
             {
-                return NtStatus.Error;
+                return NtStatus.ObjectNameNotFound;
             }
             catch (SshConnectionException e)
             {
@@ -601,13 +606,13 @@ namespace DokanSSHFS
 
                 if (atime.HasValue)
                 {
-                    // Not yet implemented
+                    // Not yet implemented in SSH library
                     // client.SetLastAccessTime(path, atime.Value);
                 }
 
                 if (mtime.HasValue)
                 {
-                    // Not yet implemented
+                    // Not yet implemented in SSH library
                     // client.SetLastWriteTime(path, atime.Value);
                 }
 
@@ -615,7 +620,7 @@ namespace DokanSSHFS
             }
             catch (SftpPathNotFoundException)
             {
-                return NtStatus.Error;
+                return NtStatus.ObjectNameNotFound;
             }
             catch (SshConnectionException e)
             {
@@ -640,11 +645,11 @@ namespace DokanSSHFS
             }
             catch (SftpPathNotFoundException)
             {
-                return NtStatus.Error;
+                return NtStatus.ObjectNameNotFound;
             }
             catch (SftpPermissionDeniedException)
             {
-                return NtStatus.Error;
+                return NtStatus.AccessDenied;
             }
             catch (SshConnectionException e)
             {
@@ -662,18 +667,18 @@ namespace DokanSSHFS
             DebugWrite("DeleteDirectory {0}", filename);
             try
             {
-                string path = GetPath(filename);
-                var channel = GetClient();
-                channel.DeleteDirectory(path);
+                var path = GetPath(filename);
+                var client = GetClient();
+                client.DeleteDirectory(path);
                 return NtStatus.Success;
             }
             catch (SftpPathNotFoundException)
             {
-                return NtStatus.Error;
+                return NtStatus.ObjectNameNotFound;
             }
             catch (SftpPermissionDeniedException)
             {
-                return NtStatus.Error;
+                return NtStatus.AccessDenied;
             }
             catch (SshConnectionException e)
             {
@@ -682,18 +687,19 @@ namespace DokanSSHFS
                 Reconnect();
                 return NtStatus.Error;
             }
+            catch (SshException e)
+            {
+                DebugWrite(e.Message);
+                return NtStatus.Error;
+            }
         }
 
-        public NtStatus MoveFile(
-            string filename,
-            string newname,
-            bool replace,
-            DokanFileInfo info)
+        public NtStatus MoveFile(string fileName, string newname, bool replace, DokanFileInfo info)
         {
-            DebugWrite("MoveFile {0}", filename);
+            DebugWrite("MoveFile {0}", fileName);
             try
             {
-                string oldPath = GetPath(filename);
+                string oldPath = GetPath(fileName);
                 string newPath = GetPath(newname);
                 var client = GetClient();
                 client.RenameFile(oldPath, newPath);
@@ -701,7 +707,7 @@ namespace DokanSSHFS
             }
             catch (SftpPermissionDeniedException)
             {
-                return NtStatus.Error;
+                return NtStatus.ObjectNameNotFound;
             }
             catch (SshConnectionException e)
             {
@@ -712,14 +718,12 @@ namespace DokanSSHFS
             }
         }
 
-        public NtStatus SetEndOfFile(
-            string filename,
-            long length,
-            DokanFileInfo info)
+        public NtStatus SetEndOfFile(string fileName, long length, DokanFileInfo info)
         {
+            DebugWrite("SetEndOfFile");
             try
             {
-                string path = GetPath(filename);
+                string path = GetPath(fileName);
                 var channel = GetClient();
                 var attr = channel.GetAttributes(path);
                 attr.Size = length;
@@ -728,7 +732,7 @@ namespace DokanSSHFS
             }
             catch (SftpPathNotFoundException)
             {
-                return NtStatus.Error;
+                return NtStatus.ObjectNameNotFound;
             }
             catch (SshConnectionException e)
             {
@@ -741,6 +745,7 @@ namespace DokanSSHFS
 
         public NtStatus SetAllocationSize(string filename, long length, DokanFileInfo info)
         {
+            DebugWrite("SetAllocationSize");
             try
             {
                 string path = GetPath(filename);
@@ -753,7 +758,7 @@ namespace DokanSSHFS
             }
             catch (SftpPathNotFoundException)
             {
-                return NtStatus.Error;
+                return NtStatus.ObjectNameNotFound;
             }
             catch (SshConnectionException e)
             {
@@ -765,44 +770,36 @@ namespace DokanSSHFS
             return NtStatus.Success;
         }
 
-        public NtStatus LockFile(
-            string filename,
-            long offset,
-            long length,
-            DokanFileInfo info)
+        public NtStatus LockFile(string fileName, long offset, long length, DokanFileInfo info)
+        {
+            DebugWrite("LockFile");
+            return NtStatus.Success;
+        }
+
+        public NtStatus UnlockFile(string fileName, long offset, long length, DokanFileInfo info)
+        {
+            DebugWrite("UnlockFile");
+            return NtStatus.Success;
+        }
+
+        public NtStatus GetDiskFreeSpace(out long freeBytesAvailable, out long totalBytes, out long totalFreeBytes, DokanFileInfo info)
+        {
+            // Return some placeholder values
+            const long GB = 1024L * 1024 * 1024;
+
+            freeBytesAvailable = 10 * GB;
+            totalBytes = 20 * GB;
+            totalFreeBytes = 10 * GB;
+
+            return NtStatus.Success;
+        }
+
+        public NtStatus Mounted(DokanFileInfo info)
         {
             return NtStatus.Success;
         }
 
-        public NtStatus UnlockFile(
-            string filename,
-            long offset,
-            long length,
-            DokanFileInfo info)
-        {
-            return NtStatus.Success;
-        }
-
-        public NtStatus GetDiskFreeSpace(
-                     out long freeBytesAvailable,
-                     out long totalBytes,
-                     out long totalFreeBytes,
-                     DokanFileInfo info)
-        {
-            freeBytesAvailable = 1024L * 1024 * 1024 * 10;
-            totalBytes = 1024L * 1024 * 1024 * 20;
-            totalFreeBytes = 1024L * 1024 * 1024 * 10;
-            return NtStatus.Success;
-        }
-
-        public NtStatus Mounted(
-            DokanFileInfo info)
-        {
-            return NtStatus.NotImplemented;
-        }
-
-        public NtStatus Unmounted(
-            DokanFileInfo info)
+        public NtStatus Unmounted(DokanFileInfo info)
         {
             try
             {
@@ -821,21 +818,35 @@ namespace DokanSSHFS
 
         public NtStatus GetFileSecurity(string fileName, out FileSystemSecurity security, AccessControlSections sections, DokanFileInfo info)
         {
+            //if (info.IsDirectory)
+            //{
+            //    security = new DirectorySecurity();// fileName, AccessControlSections.All);
+            //}
+            //else
+            //{
+            //    security = new FileSecurity();// fileName, AccessControlSections.All);
+            //}
+            DebugWrite("GetFileSecurity not implemented");
             security = null;
             return NtStatus.Error;
         }
 
         public NtStatus SetFileSecurity(string fileName, FileSystemSecurity security, AccessControlSections sections, DokanFileInfo info)
         {
+            DebugWrite("SetFileSecurity not implemented");
             return NtStatus.Error;
         }
 
         public NtStatus GetVolumeInformation(out string volumeLabel, out FileSystemFeatures features, out string fileSystemName, DokanFileInfo info)
         {
-            volumeLabel = String.Empty;
-            features = FileSystemFeatures.None;
-            fileSystemName = String.Empty;
-            return NtStatus.Error;
+            volumeLabel = _volumeLabel;
+            fileSystemName = "SSHFS";
+
+            features = FileSystemFeatures.CasePreservedNames | FileSystemFeatures.CaseSensitiveSearch |
+                       FileSystemFeatures.PersistentAcls | FileSystemFeatures.SupportsRemoteStorage |
+                       FileSystemFeatures.UnicodeOnDisk;
+
+            return NtStatus.Success;
         }
     }
 }

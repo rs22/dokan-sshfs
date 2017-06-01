@@ -28,16 +28,10 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.components = new System.ComponentModel.Container();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(frmMain));
             this.openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
             this.btnConnect = new System.Windows.Forms.Button();
-            this.btnCancel = new System.Windows.Forms.Button();
-            this.notifyIcon1 = new System.Windows.Forms.NotifyIcon(this.components);
-            this.notifyMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
-            this.exit = new System.Windows.Forms.ToolStripMenuItem();
-            this.btnUnmount = new System.Windows.Forms.ToolStripMenuItem();
-            this.btnMount = new System.Windows.Forms.ToolStripMenuItem();
+            this.btnExit = new System.Windows.Forms.Button();
             this.btnSavePreset = new System.Windows.Forms.Button();
             this.btnRemovePreset = new System.Windows.Forms.Button();
             this.cmbSelectedPreset = new System.Windows.Forms.ComboBox();
@@ -61,7 +55,7 @@
             this.cmbDriveLetter = new System.Windows.Forms.ComboBox();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
-            this.notifyMenu.SuspendLayout();
+            this.btnUnmount = new System.Windows.Forms.Button();
             this.tableLayoutPanel1.SuspendLayout();
             this.groupBox1.SuspendLayout();
             this.SuspendLayout();
@@ -73,64 +67,25 @@
             // btnConnect
             // 
             this.btnConnect.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnConnect.Location = new System.Drawing.Point(201, 248);
+            this.btnConnect.Location = new System.Drawing.Point(120, 248);
             this.btnConnect.Name = "btnConnect";
             this.btnConnect.Size = new System.Drawing.Size(75, 25);
             this.btnConnect.TabIndex = 0;
-            this.btnConnect.Text = "Connect";
+            this.btnConnect.Text = "Mount";
             this.btnConnect.UseVisualStyleBackColor = true;
             this.btnConnect.Click += new System.EventHandler(this.Connect_Click);
             // 
-            // btnCancel
+            // btnExit
             // 
-            this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.btnCancel.Location = new System.Drawing.Point(282, 248);
-            this.btnCancel.Name = "btnCancel";
-            this.btnCancel.Size = new System.Drawing.Size(75, 25);
-            this.btnCancel.TabIndex = 1;
-            this.btnCancel.Text = "Close";
-            this.btnCancel.UseVisualStyleBackColor = true;
-            this.btnCancel.Click += new System.EventHandler(this.Cancel_Click);
-            // 
-            // notifyIcon1
-            // 
-            this.notifyIcon1.ContextMenuStrip = this.notifyMenu;
-            this.notifyIcon1.Icon = ((System.Drawing.Icon)(resources.GetObject("notifyIcon1.Icon")));
-            this.notifyIcon1.Text = "SSHFS";
-            this.notifyIcon1.Visible = true;
-            // 
-            // notifyMenu
-            // 
-            this.notifyMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.exit,
-            this.btnUnmount,
-            this.btnMount});
-            this.notifyMenu.Name = "Exit";
-            this.notifyMenu.ShowImageMargin = false;
-            this.notifyMenu.Size = new System.Drawing.Size(101, 70);
-            // 
-            // exit
-            // 
-            this.exit.Name = "exit";
-            this.exit.Size = new System.Drawing.Size(100, 22);
-            this.exit.Text = "Exit";
-            this.exit.Click += new System.EventHandler(this.btnExit_Click);
-            // 
-            // btnUnmount
-            // 
-            this.btnUnmount.Name = "btnUnmount";
-            this.btnUnmount.Size = new System.Drawing.Size(100, 22);
-            this.btnUnmount.Text = "Unmount";
-            this.btnUnmount.Visible = false;
-            this.btnUnmount.Click += new System.EventHandler(this.btnUnmount_Click);
-            // 
-            // btnMount
-            // 
-            this.btnMount.Name = "btnMount";
-            this.btnMount.Size = new System.Drawing.Size(100, 22);
-            this.btnMount.Text = "Mount";
-            this.btnMount.Click += new System.EventHandler(this.btnMount_Click);
+            this.btnExit.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnExit.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+            this.btnExit.Location = new System.Drawing.Point(282, 248);
+            this.btnExit.Name = "btnExit";
+            this.btnExit.Size = new System.Drawing.Size(75, 25);
+            this.btnExit.TabIndex = 1;
+            this.btnExit.Text = "Exit";
+            this.btnExit.UseVisualStyleBackColor = true;
+            this.btnExit.Click += new System.EventHandler(this.btnExit_Click);
             // 
             // btnSavePreset
             // 
@@ -418,15 +373,27 @@
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "Identity";
             // 
+            // btnUnmount
+            // 
+            this.btnUnmount.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnUnmount.Location = new System.Drawing.Point(201, 248);
+            this.btnUnmount.Name = "btnUnmount";
+            this.btnUnmount.Size = new System.Drawing.Size(75, 25);
+            this.btnUnmount.TabIndex = 26;
+            this.btnUnmount.Text = "Unmount";
+            this.btnUnmount.UseVisualStyleBackColor = true;
+            this.btnUnmount.Click += new System.EventHandler(this.btnUnmount_Click);
+            // 
             // frmMain
             // 
             this.AcceptButton = this.btnConnect;
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.CancelButton = this.btnCancel;
+            this.CancelButton = this.btnExit;
             this.ClientSize = new System.Drawing.Size(369, 285);
+            this.Controls.Add(this.btnUnmount);
             this.Controls.Add(this.tableLayoutPanel1);
-            this.Controls.Add(this.btnCancel);
+            this.Controls.Add(this.btnExit);
             this.Controls.Add(this.btnConnect);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MaximizeBox = false;
@@ -435,7 +402,6 @@
             this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Hide;
             this.Text = "SSHFS";
             this.Load += new System.EventHandler(this.frmMain_Load);
-            this.notifyMenu.ResumeLayout(false);
             this.tableLayoutPanel1.ResumeLayout(false);
             this.tableLayoutPanel1.PerformLayout();
             this.groupBox1.ResumeLayout(false);
@@ -447,15 +413,10 @@
         #endregion
         private System.Windows.Forms.OpenFileDialog openFileDialog1;
         private System.Windows.Forms.Button btnConnect;
-        private System.Windows.Forms.Button btnCancel;
-        private System.Windows.Forms.NotifyIcon notifyIcon1;
-        private System.Windows.Forms.ContextMenuStrip notifyMenu;
-        private System.Windows.Forms.ToolStripMenuItem exit;
-        private System.Windows.Forms.ToolStripMenuItem btnUnmount;
+        private System.Windows.Forms.Button btnExit;
         private System.Windows.Forms.Button btnSavePreset;
         private System.Windows.Forms.Button btnRemovePreset;
         private System.Windows.Forms.ComboBox cmbSelectedPreset;
-        private System.Windows.Forms.ToolStripMenuItem btnMount;
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.Label label4;
         private System.Windows.Forms.TextBox txtPath;
@@ -476,5 +437,6 @@
         private System.Windows.Forms.Label label6;
         private System.Windows.Forms.RadioButton usePrivateKey;
         private System.Windows.Forms.Button btnOpenPrivateKey;
+        private System.Windows.Forms.Button btnUnmount;
     }
 }

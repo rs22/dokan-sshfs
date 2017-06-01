@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Threading;
 using DokanNet;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace DokanSSHFS
 {
@@ -23,7 +24,6 @@ namespace DokanSSHFS
 
         private void frmMain_Load(object sender, EventArgs e)
         {
-            notifyIcon1.Visible = true;
             LoadPresets();
         }
 
@@ -59,16 +59,8 @@ namespace DokanSSHFS
             }
         }
 
-        private void Cancel_Click(object sender, EventArgs e)
-        {
-            notifyIcon1.Visible = false;
-            Application.Exit();
-        }
-
         private void Connect_Click(object sender, EventArgs e)
         {
-            Hide();
-
             int port = 22;
             
             _sshfs = new SshFS();
@@ -116,7 +108,6 @@ namespace DokanSSHFS
                     message += "Drive letter is invalid\n";
 
                 _mountPoint = string.Format("{0}:\\", letter);
-                btnUnmount.Text = "Unmount (" + _mountPoint + ")";
             }
 
             //threadCount = DokanSSHFS.DokanThread;
@@ -130,6 +121,13 @@ namespace DokanSSHFS
 
             //DokanSSHFS.UseOffline = false;
 
+            var volumeLabel = _storedPresets.Presets.Any(x => x.Name == (string)cmbSelectedPreset.SelectedItem)
+                ? (string)cmbSelectedPreset.SelectedItem
+                : txtHost.Text;
+
+            if (!Regex.IsMatch(volumeLabel, "^([a-z]|[A-Z])+$"))
+                volumeLabel = "SSHFS";
+
             _sshfs.Initialize(
                 txtUser.Text,
                 txtHost.Text,
@@ -137,12 +135,11 @@ namespace DokanSSHFS
                 usePrivateKey.Checked ? null : txtPassword.Text,
                 usePrivateKey.Checked ? txtPrivateKey.Text : null,
                 usePrivateKey.Checked ? passphrase.Text : null,
-                txtPath.Text);
+                txtPath.Text,
+                volumeLabel);
 
             if (_sshfs.SSHConnect())
             {
-                btnUnmount.Visible = true;
-                btnMount.Visible = false;
                 _isUnmounted = false;
                 
                 var worker = new MountWorker(_sshfs, _options, _mountPoint, 1);
@@ -179,23 +176,17 @@ namespace DokanSSHFS
                 // Call here explicitly.
                 _sshfs.Unmounted(null);
             }
-            btnUnmount.Visible = false;
-            btnMount.Visible = true;
         }
         
         private void btnExit_Click(object sender, EventArgs e)
         {
-            notifyIcon1.Visible = false;
-
             if (!_isUnmounted)
             {
-                Debug.WriteLine("unmount is visible");
-                btnUnmount.Visible = false;
                 Unmount();
                 _isUnmounted = true;
             }
 
-            Debug.WriteLine("SSHFS Thread Waitting");
+            Debug.WriteLine("SSHFS Thread Waiting");
 
             if (_fileSystemThread != null && _fileSystemThread.IsAlive)
             {
@@ -295,7 +286,6 @@ namespace DokanSSHFS
 
         private void btnMount_Click(object sender, EventArgs e)
         {
-            btnUnmount.Visible = false;
             Show();
         }
     }
