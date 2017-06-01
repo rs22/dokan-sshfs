@@ -8,6 +8,7 @@ using DokanNet;
 using System.Security.AccessControl;
 using Renci.SshNet;
 using Renci.SshNet.Common;
+using System.Diagnostics;
 
 namespace DokanSSHFS
 {
@@ -20,18 +21,15 @@ namespace DokanSSHFS
         private string _host;
         private int _port;
         private string _identity;
-        private bool _debug;
         private string _root;
         private string _passphrase;
         private string _password;
-
-        private TextWriter _tw;
 
         private int _trycount = 0;
         private bool _connectionError = false;
         private object _reconnectLock = new object();
 
-        public void Initialize(string user, string host, int port, string password, string identity, string passphrase, string root, bool debug)
+        public void Initialize(string user, string host, int port, string password, string identity, string passphrase, string root)
         {
             _user = user;
             _host = host;
@@ -41,27 +39,13 @@ namespace DokanSSHFS
             _passphrase = passphrase;
 
             _root = root;
-
-            _debug = debug;
-
-            if (_debug && _tw != null)
-            {
-                StreamWriter sw = new StreamWriter(Application.UserAppDataPath + "\\error.txt")
-                {
-                    AutoFlush = true
-                };
-                _tw = TextWriter.Synchronized(sw);
-                Console.SetError(_tw);
-            }
-
         }
 
-        private void Debug(string format, params object[] args)
+        private void DebugWrite(string format, params object[] args)
         {
-            if (_debug)
+            if (true)
             {
-                Console.Error.WriteLine("SSHFS: " + format, args);
-                System.Diagnostics.Debug.WriteLine(string.Format("SSHFS: " + format, args));
+                Debug.WriteLine(string.Format("SSHFS: " + format, args));
             }
         }
 
@@ -69,34 +53,18 @@ namespace DokanSSHFS
         {
             try
             {
-                var credentials = new PasswordAuthenticationMethod(_user, _password);
+                var credentials = !string.IsNullOrEmpty(_password) 
+                    ? (AuthenticationMethod)new PasswordAuthenticationMethod(_user, _password)
+                    : new PrivateKeyAuthenticationMethod(_user, new PrivateKeyFile(_identity, _passphrase));
                 var connectionInfo = new ConnectionInfo(_host, _port, _user, credentials);
                 
                 _client = new SftpClient(connectionInfo);
-
                 _client.Connect();
-
-                //_channels = new Dictionary<int, ChannelSftp>();
-
-                //jsch_ = new JSch();
-                //Hashtable config = new Hashtable();
-                //config["StrictHostKeyChecking"] = "no";
-
-                //if (_identity != null)
-                //    jsch_.addIdentity(_identity, _passphrase);
-
-                //session_ = jsch_.getSession(_user, _host, _port);
-                //session_.setConfig(config);
-                //session_.setUserInfo(new DokanUserInfo(_password, _passphrase));
-                //session_.setPassword(_password);
-
-                //session_.connect();
-
                 return true;
             }
             catch (Exception e)
             {
-                Debug(e.ToString());
+                DebugWrite(e.ToString());
                 return false;
             }
         }
@@ -108,31 +76,29 @@ namespace DokanSSHFS
                 if (!_connectionError)
                     return true;
 
-                Debug("Disconnect current sessions\n");
+                DebugWrite("Disconnect current sessions\n");
                 try
                 {
                     GetClient().Disconnect();
-
-                    //session_.disconnect();
                 }
                 catch (Exception e)
                 {
-                    Debug(e.ToString());
+                    DebugWrite(e.ToString());
                 }
 
-                Debug("Reconnect {0}\n", _trycount);
+                DebugWrite("Reconnect {0}\n", _trycount);
 
                 _trycount++;
 
                 if (SSHConnect())
                 {
-                    Debug("Reconnect success\n");
+                    DebugWrite("Reconnect success\n");
                     _connectionError = false;
                     return true;
                 }
                 else
                 {
-                    Debug("Reconnect failed\n");
+                    DebugWrite("Reconnect failed\n");
                     return false;
                 }
             }
@@ -141,32 +107,14 @@ namespace DokanSSHFS
         private string GetPath(string filename)
         {
             string path = _root + filename.Replace('\\', '/');
-            Debug("GetPath : {0} thread {1}", path, Thread.CurrentThread.ManagedThreadId);
+            DebugWrite("GetPath : {0} thread {1}", path, Thread.CurrentThread.ManagedThreadId);
             //Debug("  Stack {0}", new System.Diagnostics.StackTrace().ToString());
             return path;
         }
 
         private SftpClient GetClient()
         {
-            int threadId = Thread.CurrentThread.ManagedThreadId;
             return _client;
-
-            //ChannelSftp channel;
-            //try
-            //{
-            //    channel = channels_[threadId];
-            //}
-            //catch(KeyNotFoundException)
-            //{
-
-            //    lock (sessionLock_)
-            //    {
-            //        channel = (ChannelSftp)session_.openChannel("sftp");
-            //        channel.connect();
-            //        channels_[threadId] = channel;
-            //    }
-            //}
-            //return channel;
         }
 
         private bool PathExists(string path, DokanFileInfo info)
@@ -184,25 +132,6 @@ namespace DokanSSHFS
                 return false;
             }
         }
-
-        //private string ReadPermission(string path)
-        //{
-        //    try
-        //    {
-        //        var attr = GetClient().GetAttributes(path);
-        //        return Convert.ToString(attr.own() & 0xFFF, 8) + "\n";
-        //    }
-        //    catch (SftpException)
-        //    {
-        //        return "";
-        //    }
-        //    catch (Exception)
-        //    {
-        //        _connectionError = true;
-        //        Reconnect();
-        //        return "";
-        //    }
-        //}
 
         private bool CheckAltStream(string filename)
         {
@@ -242,7 +171,7 @@ namespace DokanSSHFS
                 switch (mode)
                 {
                     case FileMode.Open:
-                        Debug("OpenDirectory {0}", filename);
+                        DebugWrite("OpenDirectory {0}", filename);
                         try
                         {
                             var attr = GetClient().GetAttributes(path);
@@ -257,20 +186,20 @@ namespace DokanSSHFS
                         }
                         catch (SftpPathNotFoundException e)
                         {
-                            Debug(e.ToString());
+                            DebugWrite(e.ToString());
                             return NtStatus.ObjectPathNotFound;
                         }
                         catch (SshConnectionException e)
                         {
                             _connectionError = true;
-                            Debug(e.ToString());
+                            DebugWrite(e.ToString());
                             Reconnect();
                             return NtStatus.ObjectPathNotFound;
                         }
 
 
                     case FileMode.CreateNew:
-                        Debug("CreateDirectory {0}", filename);
+                        DebugWrite("CreateDirectory {0}", filename);
                         try
                         {
                             var client = GetClient();
@@ -280,25 +209,25 @@ namespace DokanSSHFS
                         }
                         catch (SftpPermissionDeniedException e)
                         {
-                            Debug(e.ToString());
+                            DebugWrite(e.ToString());
                             return NtStatus.Error;
                         }
                         catch (SshConnectionException e)
                         {
                             _connectionError = true;
-                            Debug(e.ToString());
+                            DebugWrite(e.ToString());
                             Reconnect();
                             return NtStatus.Error; // TODO: more appropriate error code
                         }
                     default:
-                        Debug("Error FileMode invalid for directory {0}", mode);
+                        DebugWrite("Error FileMode invalid for directory {0}", mode);
                         return NtStatus.Error;
 
                 }
             }
             else
             {
-                Debug("CreateFile {0}", filename);
+                DebugWrite("CreateFile {0}", filename);
                 try
                 {
                     var client = GetClient();
@@ -310,7 +239,7 @@ namespace DokanSSHFS
                     {
                         case FileMode.Open:
                             {
-                                Debug("Open");
+                                DebugWrite("Open");
                                 if (PathExists(path, info))
                                     return NtStatus.Success;
                                 else
@@ -318,55 +247,55 @@ namespace DokanSSHFS
                             }
                         case FileMode.CreateNew:
                             {
-                                Debug("CreateNew");
+                                DebugWrite("CreateNew");
                                 if (PathExists(path, info))
                                     return NtStatus.ObjectNameCollision;
 
-                                Debug("CreateNew put 0 byte");
+                                DebugWrite("CreateNew put 0 byte");
                                 client.Create(path).Close();
                                 return NtStatus.Success;
                             }
                         case FileMode.Create:
                             {
-                                Debug("Create put 0 byte");
+                                DebugWrite("Create put 0 byte");
                                 client.Create(path).Close();
                                 return NtStatus.Success;
                             }
                         case FileMode.OpenOrCreate:
                             {
-                                Debug("OpenOrCreate");
+                                DebugWrite("OpenOrCreate");
 
                                 if (!PathExists(path, info))
                                 {
-                                    Debug("OpenOrCreate put 0 byte");
+                                    DebugWrite("OpenOrCreate put 0 byte");
                                     client.Create(path).Close();
                                 }
                                 return NtStatus.Success;
                             }
                         case FileMode.Truncate:
                             {
-                                Debug("Truncate");
+                                DebugWrite("Truncate");
 
                                 if (!PathExists(path, info))
                                     return NtStatus.ObjectNameNotFound;
 
-                                Debug("Truncate put 0 byte");
+                                DebugWrite("Truncate put 0 byte");
                                 client.Create(path).Close();
                                 return NtStatus.Success;
                             }
                         case FileMode.Append:
                             {
-                                Debug("Append");
+                                DebugWrite("Append");
 
                                 if (PathExists(path, info))
                                     return NtStatus.Success;
 
-                                Debug("Append put 0 byte");
+                                DebugWrite("Append put 0 byte");
                                 client.Create(path).Close();
                                 return NtStatus.Success;
                             }
                         default:
-                            Debug("Error unknown FileMode {0}", mode);
+                            DebugWrite("Error unknown FileMode {0}", mode);
                             return NtStatus.Error;
                     }
 
@@ -380,7 +309,7 @@ namespace DokanSSHFS
                 catch (Exception e)
                 {
                     _connectionError = true;
-                    Debug(e.ToString());
+                    DebugWrite(e.ToString());
                     Reconnect();
                     return NtStatus.ObjectNameNotFound;
                 }
@@ -431,7 +360,7 @@ namespace DokanSSHFS
             if (info.IsDirectory)
                 return NtStatus.Error;
 
-            Debug("ReadFile {0} bufferLen {1} Offset {2}", filename, buffer.Length, offset);
+            DebugWrite("ReadFile {0} bufferLen {1} Offset {2}", filename, buffer.Length, offset);
             try
             {
                 var client = GetClient();
@@ -440,11 +369,7 @@ namespace DokanSSHFS
                     var position = stream.Seek(offset, SeekOrigin.Begin);
                     readBytes = stream.Read(buffer, 0, buffer.Length);
                 }
-                //GetMonitor monitor = new GetMonitor(offset + buffer.Length);
-                //GetStream stream = new GetStream(buffer);
-                //client.get(path, stream, monitor, ChannelSftp.RESUME, offset);
-                //readBytes = stream.RecievedBytes;
-                Debug("  ReadFile readBytes: {0}", readBytes);
+                DebugWrite("  ReadFile readBytes: {0}", readBytes);
                 return NtStatus.Success;
             }
             //catch (SftpException)
@@ -454,35 +379,11 @@ namespace DokanSSHFS
             catch (Exception e)
             {
                 _connectionError = true;
-                Debug(e.ToString());
+                DebugWrite(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
             }
         }
-
-        //private bool WritePermission(
-        //    string path,
-        //    int permission)
-        //{
-        //    try
-        //    {
-        //        Debug("WritePermission {0}:{1}", path, Convert.ToString(permission, 8));
-        //        var channel = GetClient();
-        //        var attr = channel.GetAttributes(path);
-        //        attr.setPERMISSIONS(permission);
-        //        channel.setStat(path, attr);
-        //    }
-        //    catch (SftpException)
-        //    {
-        //    }
-        //    catch (Exception e)
-        //    {
-        //        _connectionError = true;
-        //        Debug(e.ToString());
-        //        Reconnect();
-        //    }
-        //    return true;
-        //}
 
         public NtStatus WriteFile(
             string filename,
@@ -491,7 +392,7 @@ namespace DokanSSHFS
             long offset,
             DokanFileInfo info)
         {
-            Debug("WriteFile {0} bufferLen {1} Offset {2}", filename, buffer.Length, offset);
+            DebugWrite("WriteFile {0} bufferLen {1} Offset {2}", filename, buffer.Length, offset);
 
             string path = GetPath(filename);
 
@@ -531,7 +432,7 @@ namespace DokanSSHFS
             }
             catch (Exception e)
             {
-                Debug(e.ToString());
+                DebugWrite(e.ToString());
                 return NtStatus.Error;
             }
         }
@@ -559,8 +460,8 @@ namespace DokanSSHFS
                     FileAttributes.Directory :
                     FileAttributes.Normal;
 
-                if (DokanSSHFS.UseOffline)
-                    fileinfo.Attributes |= FileAttributes.Offline;
+                //if (DokanSSHFS.UseOffline)
+                //    fileinfo.Attributes |= FileAttributes.Offline;
 
                 fileinfo.CreationTime = attr.LastWriteTime;
                 fileinfo.LastAccessTime = attr.LastAccessTime;
@@ -576,7 +477,7 @@ namespace DokanSSHFS
             catch (Exception e)
             {
                 _connectionError = true;
-                Debug(e.ToString());
+                DebugWrite(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
             }
@@ -597,7 +498,7 @@ namespace DokanSSHFS
             out IList<FileInformation> files,
             DokanFileInfo info)
         {
-            Debug("FindFiles {0}", filename);
+            DebugWrite("FindFiles {0}", filename);
 
             files = new List<FileInformation>();
             try
@@ -624,10 +525,9 @@ namespace DokanSSHFS
                         fi.Attributes |= FileAttributes.Hidden;
                     }
 
-                    if (DokanSSHFS.UseOffline)
-                        fi.Attributes |= FileAttributes.Offline;
-
-
+                    //if (DokanSSHFS.UseOffline)
+                    //    fi.Attributes |= FileAttributes.Offline;
+                    
                     files.Add(fi);
                 }
                 return NtStatus.Success;
@@ -640,7 +540,7 @@ namespace DokanSSHFS
             catch (Exception e)
             {
                 _connectionError = true;
-                Debug(e.ToString());
+                DebugWrite(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
             }
@@ -657,7 +557,7 @@ namespace DokanSSHFS
             FileAttributes attr,
             DokanFileInfo info)
         {
-            Debug("SetFileAttributes {0}", filename);
+            DebugWrite("SetFileAttributes {0}", filename);
             try
             {
                 // Nothing to do here?
@@ -678,7 +578,7 @@ namespace DokanSSHFS
             catch (SshConnectionException e)
             {
                 _connectionError = true;
-                Debug(e.ToString());
+                DebugWrite(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
             }
@@ -691,10 +591,10 @@ namespace DokanSSHFS
             DateTime? mtime,
             DokanFileInfo info)
         {
-            Debug("SetFileTime {0}", filename);
+            DebugWrite("SetFileTime {0}", filename);
             try
             {
-                Debug(" filetime {0} {1} {2}", ctime.HasValue ? ctime.ToString() : "-", atime.HasValue ? atime.ToString() : "-", mtime.HasValue ? mtime.ToString() : "-");
+                DebugWrite(" filetime {0} {1} {2}", ctime.HasValue ? ctime.ToString() : "-", atime.HasValue ? atime.ToString() : "-", mtime.HasValue ? mtime.ToString() : "-");
 
                 string path = GetPath(filename);
                 var client = GetClient();
@@ -720,7 +620,7 @@ namespace DokanSSHFS
             catch (SshConnectionException e)
             {
                 _connectionError = true;
-                Debug(e.ToString());
+                DebugWrite(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
             }
@@ -730,7 +630,7 @@ namespace DokanSSHFS
             string filename,
             DokanFileInfo info)
         {
-            Debug("DeleteFile {0}", filename);
+            DebugWrite("DeleteFile {0}", filename);
             try
             {
                 string path = GetPath(filename);
@@ -749,7 +649,7 @@ namespace DokanSSHFS
             catch (SshConnectionException e)
             {
                 _connectionError = true;
-                Debug(e.ToString());
+                DebugWrite(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
             }
@@ -759,7 +659,7 @@ namespace DokanSSHFS
             string filename,
             DokanFileInfo info)
         {
-            Debug("DeleteDirectory {0}", filename);
+            DebugWrite("DeleteDirectory {0}", filename);
             try
             {
                 string path = GetPath(filename);
@@ -778,7 +678,7 @@ namespace DokanSSHFS
             catch (SshConnectionException e)
             {
                 _connectionError = true;
-                Debug(e.ToString());
+                DebugWrite(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
             }
@@ -790,7 +690,7 @@ namespace DokanSSHFS
             bool replace,
             DokanFileInfo info)
         {
-            Debug("MoveFile {0}", filename);
+            DebugWrite("MoveFile {0}", filename);
             try
             {
                 string oldPath = GetPath(filename);
@@ -806,7 +706,7 @@ namespace DokanSSHFS
             catch (SshConnectionException e)
             {
                 _connectionError = true;
-                Debug(e.ToString());
+                DebugWrite(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
             }
@@ -833,7 +733,7 @@ namespace DokanSSHFS
             catch (SshConnectionException e)
             {
                 _connectionError = true;
-                Debug(e.ToString());
+                DebugWrite(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
             }
@@ -858,7 +758,7 @@ namespace DokanSSHFS
             catch (SshConnectionException e)
             {
                 _connectionError = true;
-                Debug(e.ToString());
+                DebugWrite(e.ToString());
                 Reconnect();
                 return NtStatus.Error;
             }
@@ -906,19 +806,15 @@ namespace DokanSSHFS
         {
             try
             {
-                Debug("disconnection...");
+                DebugWrite("disconnection...");
 
                 GetClient().Disconnect();
 
-                Thread.Sleep(1000 * 1);
-
-                //session_.disconnect();
-
-                Debug("disconnected");
+                DebugWrite("disconnected");
             }
             catch (Exception e)
             {
-                Debug(e.ToString());
+                DebugWrite(e.ToString());
             }
             return NtStatus.Success;
         }
