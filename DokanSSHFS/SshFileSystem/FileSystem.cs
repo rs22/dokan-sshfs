@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
-using System.Windows.Forms;
 
 using DokanNet;
 using System.Security.AccessControl;
@@ -11,9 +10,9 @@ using Renci.SshNet.Common;
 using System.Diagnostics;
 using System.Linq;
 
-namespace DokanSSHFS
+namespace SshFileSystem
 {
-    public class SshFS : IDokanOperations
+    public class FileSystem : IDokanOperations
     {
         private object _sessionLock = new Object();
         private SftpClient _client;

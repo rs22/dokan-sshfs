@@ -2,7 +2,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace DokanSSHFS
+namespace SshFileSystem.WinForms
 {
     public class EncryptionHelper
     {

@@ -5,7 +5,7 @@ using System.IO;
 using System.Windows.Forms;
 using System.Linq;
 
-namespace DokanSSHFS
+namespace SshFileSystem.WinForms
 {
     public class Preset
     {

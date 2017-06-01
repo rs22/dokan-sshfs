@@ -1,4 +1,4 @@
-﻿namespace DokanSSHFS
+﻿namespace SshFileSystem.WinForms
 {
     partial class frmMain
     {

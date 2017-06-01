@@ -9,15 +9,15 @@
     <ProjectGuid>{BE8954E9-27DD-46FD-8E0B-A8F43A4211AD}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DokanSSHFS</RootNamespace>
-    <AssemblyName>DokanSSHFS</AssemblyName>
+    <RootNamespace>SshFileSystem.WinForms</RootNamespace>
+    <AssemblyName>sshfs-gui</AssemblyName>
     <StartupObject>
     </StartupObject>
     <ApplicationIcon>notify3.ico</ApplicationIcon>
     <FileUpgradeFlags>
     </FileUpgradeFlags>
     <OldToolsVersion>3.5</OldToolsVersion>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <UpgradeBackupLocation>
     </UpgradeBackupLocation>
     <IsWebBootstrapper>false</IsWebBootstrapper>
@@ -78,9 +78,6 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="CommandLine, Version=1.9.71.2, Culture=neutral, PublicKeyToken=de6f01bd326f8c32, processorArchitecture=MSIL">
-      <HintPath>packages\CommandLineParser.1.9.71\lib\net40\CommandLine.dll</HintPath>
-    </Reference>
     <Reference Include="DokanNet, Version=1.1.0.3, Culture=neutral, PublicKeyToken=cef3dedf553bda55, processorArchitecture=MSIL">
       <HintPath>packages\DokanNet.1.1.0.3\lib\net40\DokanNet.dll</HintPath>
     </Reference>
@@ -100,7 +97,6 @@
   <ItemGroup>
     <Compile Include="EncryptionHelper.cs" />
     <Compile Include="MountWorker.cs" />
-    <Compile Include="SshFS.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="StoredPresets.cs" />
@@ -157,6 +153,12 @@
   <ItemGroup>
     <None Include="app.config" />
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="SshFileSystem\SshFileSystem.csproj">
+      <Project>{844b7a82-4a3d-404e-921e-f4e387f008e5}</Project>
+      <Name>SshFileSystem</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

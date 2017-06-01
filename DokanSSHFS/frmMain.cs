@@ -5,12 +5,13 @@ using System.Threading;
 using DokanNet;
 using System.Linq;
 using System.Text.RegularExpressions;
+using SshFileSystem;
 
-namespace DokanSSHFS
+namespace SshFileSystem.WinForms
 {
     public partial class frmMain : Form
     {
-        private SshFS _sshfs;
+        private FileSystem _sshfs;
         private DokanOptions _options;
         private string _mountPoint;
         private StoredPresets _storedPresets = new StoredPresets();
@@ -63,7 +64,7 @@ namespace DokanSSHFS
         {
             int port = 22;
             
-            _sshfs = new SshFS();
+            _sshfs = new FileSystem();
             _options = new DokanOptions();
 
             //if (DokanSSHFS.DokanDebug)

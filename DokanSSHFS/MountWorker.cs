@@ -2,7 +2,7 @@
 using System.Diagnostics;
 using DokanNet;
 
-namespace DokanSSHFS
+namespace SshFileSystem.WinForms
 {
     class MountWorker
     {
