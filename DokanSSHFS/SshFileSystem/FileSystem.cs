@@ -16,7 +16,7 @@ namespace SshFileSystem
     {
         private object _sessionLock = new Object();
         private SftpClient _client;
-
+        
         private string _volumeLabel;
         private string _user;
         private string _host;
@@ -62,6 +62,7 @@ namespace SshFileSystem
 
                 _client = new SftpClient(connectionInfo);
                 _client.Connect();
+
                 return true;
             }
             catch (Exception e)
@@ -108,7 +109,7 @@ namespace SshFileSystem
 
         private string GetPath(string filename)
         {
-            var path = filename.Replace('\\', '/').TrimStart('/');
+            var path = $"{_root}/{filename.Replace('\\', '/').TrimStart('/')}";
             DebugWrite("GetPath : {0} thread {1}", path, Thread.CurrentThread.ManagedThreadId);
             //Debug("  Stack {0}", new System.Diagnostics.StackTrace().ToString());
             return path;
@@ -135,45 +136,16 @@ namespace SshFileSystem
             }
         }
 
-        private bool CheckAltStream(string filename)
+        public NtStatus CreateFile(string fileName, DokanNet.FileAccess access, FileShare share, FileMode mode, FileOptions options, FileAttributes attributes, DokanFileInfo info)
         {
-            if (filename.Contains(":"))
-            {
-                string[] tmp = filename.Split(new char[] { ':' }, 2);
-
-                if (tmp.Length != 2)
-                    return false;
-
-                if (tmp[1].StartsWith("SSHFSProperty."))
-                    return true;
-
-                return false;
-            }
-            else
-            {
-                return false;
-            }
-        }
-
-
-        public NtStatus CreateFile(
-            string filename,
-            DokanNet.FileAccess access,
-            FileShare share,
-            FileMode mode,
-            FileOptions options,
-            FileAttributes attributes,
-            DokanFileInfo info)
-        {
-
-            var path = GetPath(filename);
+            var path = GetPath(fileName);
 
             if (info.IsDirectory)
             {
                 switch (mode)
                 {
                     case FileMode.Open:
-                        DebugWrite("OpenDirectory {0}", filename);
+                        DebugWrite("OpenDirectory {0}", fileName);
                         try
                         {
                             var attr = GetClient().GetAttributes(path);
@@ -202,10 +174,12 @@ namespace SshFileSystem
 
 
                     case FileMode.CreateNew:
-                        DebugWrite("CreateDirectory {0}", filename);
+                        DebugWrite("CreateDirectory {0}", fileName);
                         try
                         {
                             var client = GetClient();
+                            if (PathExists(path, info))
+                                return NtStatus.ObjectNameCollision;
 
                             client.CreateDirectory(path);
                             return NtStatus.Success;
@@ -230,7 +204,7 @@ namespace SshFileSystem
             }
             else
             {
-                DebugWrite("CreateFile {0}", filename);
+                DebugWrite("CreateFile {0}", fileName);
                 try
                 {
                     var client = GetClient();
@@ -489,7 +463,7 @@ namespace SshFileSystem
 
         public IList<FileInformation> FindFilesHelper(string fileName, string searchPattern)
         {
-            string path = GetPath(fileName);
+            var path = GetPath(fileName);
             var entries = GetClient().ListDirectory(path);
 
             return entries

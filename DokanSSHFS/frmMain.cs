@@ -146,7 +146,7 @@ namespace SshFileSystem.WinForms
             {
                 _isUnmounted = false;
                 
-                var worker = new MountWorker(_sshfs, _options, _mountPoint, 1);
+                var worker = new MountWorker(_sshfs, _options, _mountPoint, 0);
 
                 _fileSystemThread = new Thread(worker.Start);
                 _fileSystemThread.Start();
